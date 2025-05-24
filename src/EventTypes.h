@@ -1,0 +1,10 @@
+#pragma once
+
+enum eventTypes{
+    SERVER_CLOSED_EVENT = 0,
+    PLAYER_CONNECTION_EVENT = 1,
+    PLAYER_DISCONNECTION_EVENT = 2,
+    PLAYER_ID_SET_EVENT = 3,
+
+    START_MATCH_EVENT = 4,
+};

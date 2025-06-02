@@ -1,6 +1,18 @@
 .vscode
 imgui.ini
 
+DynamicTest.cpp
+DynamicTest.h
+
+ClearColorTest.cpp
+ClearColorTest.h
+
+QuadBashTest.cpp
+QuadBashTest.h
+
+TextureTransformTest.cpp
+TextureTransformTest.h
+
 *.exe
 *.o
 *.rc

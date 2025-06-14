@@ -2,6 +2,7 @@
 #include "GameManager.h"
 
 #include "imgui/imgui.h"
+#include <fstream>
 
 namespace scene{
     void Wall::setAtive(bool active)
@@ -73,54 +74,124 @@ namespace scene{
         zoom = 1.0f;
         view = glm::translate(glm::mat4(1.0f), {camPos.x + camPosOffset.x, camPos.y + camPosOffset.y, 0.0f}) * glm::scale(glm::mat4(1.0f),glm::vec3(zoom, zoom, 1.0f));
 
-
-        // Box2d world setup
-        b2WorldDef worldDef;
-        worldDef = b2DefaultWorldDef();
-        worldDef.gravity = (b2Vec2){0.0f, 0.0f};
-
-        worldId = b2CreateWorld(&worldDef);
-
-        b2BodyDef groundBodyDef = b2DefaultBodyDef();
-        groundBodyDef.position = (b2Vec2){-1.8f, -3.0f};
-        groundBodyDef.rotation = b2MakeRot(1.0f);
-
-        groundBodyId = b2CreateBody(worldId, &groundBodyDef);
-
-        b2Polygon groundBox = b2MakeBox(1.5f, 1.5f);
-        b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-        groundShapeDef.isSensor = true;
-        b2CreatePolygonShape(groundBodyId, &groundShapeDef, &groundBox); 
-
-        std::cout << "size of b2Vec2: "<<sizeof(b2Vec2) << "; \n";
-        std::cout << "size of float: "<<sizeof(float) << "\n";
-
-        walls.push_back({{0}, {-0.25, 1}, {-1.25, 0}, 4, 0.5f, false});
-        walls.push_back({{0}, {-0.75, 2.5}, {-0.25, 1}, -2, 0.5f, true});
-        walls.push_back({{0}, {2, 2.75}, {-0.75, 2.5}, 11, 0.5f, false});
-        walls.push_back({{0}, {2.75, 1}, {2, 0.25}, 3, 0.5f, false});
-        walls.push_back({{0}, {2, 0.25}, {3.25, 0}, -5, 0.5f, false});
-        walls.push_back({{0}, {2.75, 1}, {3.25, 0}, -2, 0.5f, true});
-
-        for(int i = 0; i < walls.size(); i++){
-            b2BodyDef segmentBodyDef = b2DefaultBodyDef();
-            walls[i].segmentId = b2CreateBody(worldId, &segmentBodyDef);
-
-            b2ShapeDef segmentShapeDef = b2DefaultShapeDef();
-            b2Segment segment = {walls[i].point1, walls[i].point2};
-
-            walls[i].shapeId = b2CreateSegmentShape(walls[i].segmentId, &segmentShapeDef, &segment);
-        }
-
-        ball.loadBody(worldId);
+        //WARNING: This is a temporary code, a map and couse should NEVER be loaded in the Match class constructor;
+        //loadCourse("db_testcourse");
+        //loadMap("Untitled");
         
-        //-------------------------
     }
 
     Match::~Match()
     {
         b2DestroyWorld(worldId);
     }
+
+    // LOAD AND UNLOAD FILES ========================= //
+
+    int Match::loadCourse(std::string courseName)
+    {
+        actual_course = courseName;
+        return 0;
+    }
+
+    int Match::loadMap(std::string mapName)
+    {
+        if(actual_course.length() == 0){
+            GM_LOG("Error loading Map: Can't load a map without loading it's course folder first! >> returns: 1",LOG_ERROR);
+            return 1;
+        }
+
+        std::ifstream file("res/maps/"+ actual_course+"/"+mapName+".grm", std::ios::binary);
+
+        if(file.is_open()){
+            // Box2d world setup --------- //
+            b2WorldDef worldDef;
+            worldDef = b2DefaultWorldDef();
+            worldDef.gravity = (b2Vec2){0.0f, 0.0f};
+
+            worldId = b2CreateWorld(&worldDef);
+
+            b2BodyDef groundBodyDef = b2DefaultBodyDef();
+            groundBodyDef.position = (b2Vec2){-1.8f, -3.0f};
+            groundBodyDef.rotation = b2MakeRot(1.0f);
+
+            groundBodyId = b2CreateBody(worldId, &groundBodyDef);
+
+            b2Polygon groundBox = b2MakeBox(1.5f, 1.5f);
+            b2ShapeDef groundShapeDef = b2DefaultShapeDef();
+            groundShapeDef.isSensor = true;
+            b2CreatePolygonShape(groundBodyId, &groundShapeDef, &groundBox); 
+
+            ball.loadBody(worldId);
+            //----------------------------- //
+
+
+            std::cout << "size of b2Vec2: "<<sizeof(b2Vec2) << "; \n";
+            std::cout << "size of float: "<<sizeof(float) << "\n";
+
+            // reading file data here: >>>>>>>>>>
+
+            int groupCount = 0;
+            file.read((char*)&groupCount, sizeof(int));
+
+            for(int i = 0; i < groupCount; i++){
+                
+                groups.push_back(WallGroup());
+                std::cout << "Creating group: "<< i <<"\n";
+                int wallCount = 0;
+                file.read((char*)&wallCount, sizeof(int));
+                 std::cout << "Group "<< i << " have " << wallCount << " walls .\n";
+
+                for(int w = 0; w < wallCount; w++){
+                    std::cout << "Creating wall "<< w << " of the group: "<< i <<"\n";
+                    //read the segment data
+                    //order: pont1 | point2 | inclination | tan | is_tall
+                    Wall newWall;
+                    file.read((char*)&newWall.point1, sizeof(b2Vec2));
+                    file.read((char*)&newWall.point2, sizeof(b2Vec2));
+
+                    file.read((char*)&newWall.inclination, sizeof(int));
+                    file.read((char*)&newWall.tan, sizeof(float));
+                    file.read((char*)&newWall.tall, sizeof(bool));
+
+                    groups[i].walls.push_back(newWall);
+
+                    // Create box2d body
+                    b2BodyDef segmentBodyDef = b2DefaultBodyDef();
+                    groups[i].walls[w].segmentId = b2CreateBody(worldId, &segmentBodyDef);
+
+                    b2ShapeDef segmentShapeDef = b2DefaultShapeDef();
+                    b2Segment segment = {groups[i].walls[w].point1, groups[i].walls[w].point2};
+
+                    groups[i].walls[w].shapeId = b2CreateSegmentShape(groups[i].walls[w].segmentId, &segmentShapeDef, &segment);
+                }
+                std::cout << "Created all walls from group: "<< i <<"\n";
+            }
+            file.close();
+            return 0;
+        }else{
+            GM_LOG("Error loading Map: Couldn't find the map file: ["+ mapName +".grm] in the folder of the course ["+actual_course+"] >> returns: 1",LOG_ERROR);
+            return 1;
+        }
+    }
+
+    void Match::unloadMap()
+    {
+        b2DestroyWorld(worldId);
+        for(WallGroup g: groups){
+            g.clearResources();
+        }
+        groups.clear();
+    }
+
+    void Match::unload()
+    {
+        unloadMap();
+
+        actual_course = "";
+        course_maps_played.clear();
+        GM_LOG("Match resources cleared.");
+    }
+    // ----------------------------------------- //
 
     void Match::OnUpdate(float deltaTime)
     {
@@ -131,12 +202,16 @@ namespace scene{
 
         b2World_Step(worldId, deltaTime, 4);
         ball.update(deltaTime);
-        for(int i = 0; i < walls.size(); i++){
-            if(!walls[i].tall && ball.height > 0.1f){
-                walls[i].setAtive(false);
-            }
-            if(!walls[i].tall && ball.height <= 0.1f){
-                walls[i].setAtive(true);
+
+        //  Check if the wall should be active, acoording to the ball height.
+        for(WallGroup g: groups){
+            for(int i = 0; i < g.walls.size(); i++){
+                if(!g.walls[i].tall && ball.height > 0.1f){
+                    g.walls[i].setAtive(false);
+                }
+                if(!g.walls[i].tall && ball.height <= 0.1f){
+                    g.walls[i].setAtive(true);
+                }
             }
         }
     }
@@ -155,9 +230,10 @@ namespace scene{
         float altitude[2] = {b2Body_GetPosition(ball.bodyId).x, b2Body_GetPosition(ball.bodyId).y + ball.height};
         Renderer::drawLine(manager->line, base, altitude, {1.0f, 1.0f, 1.0f, 1.0f});
         
-        for(int i = 0; i < walls.size(); i++){
-
-            Renderer::drawLine(manager->line, (float*)&walls[i].point1, (float*)&walls[i].point2, (walls[i].tall) ? glm::vec4{1.0f, 0.0f, 0.0f, 1.0f} : glm::vec4{0.0f, 1.0f, 0.0f, 1.0f});
+        for(WallGroup g: groups){
+            for(int i = 0; i < g.walls.size(); i++){
+                Renderer::drawLine(manager->line, (float*)&g.walls[i].point1, (float*)&g.walls[i].point2, (g.walls[i].tall) ? glm::vec4{1.0f, 0.0f, 0.0f, 1.0f} : glm::vec4{0.0f, 1.0f, 0.0f, 1.0f});
+            }
         }
 
         Renderer::drawShape(manager->square, b2Body_GetPosition(groundBodyId).x, b2Body_GetPosition(groundBodyId).y, 3.0f, 3.0f, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f});
@@ -215,5 +291,10 @@ namespace scene{
             }
         }
     }
-    
+
+    //TODO: Move this function to a different location, maybe create a .cpp file just for struct function declaraions.
+    void WallGroup::clearResources()
+    {
+    }
+
 }

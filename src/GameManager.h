@@ -112,9 +112,6 @@ private:
     //Shaders
     static std::vector<Shader*> shaders;
 
-    //Scenes
-    std::unordered_map<std::string, scene::Scene*> scenes;
-
     std::vector<std::vector<Dimension>>screenResolutions;
 
     GLFWwindow* window;
@@ -155,7 +152,9 @@ public:
     shapes::Line* line;
 
     // scenes
-    scene::Scene* actualScene;
+    std::unordered_map<std::string, scene::Scene*> scenes;
+    scene::Scene* actualScene = nullptr;
+    std::string actual_scene_name = "";
 
     void changeScene(std::string name);
 
@@ -210,12 +209,12 @@ public:
     static std::map<int , Player> connected_players;
     static std::queue<std::array<char, 256>> eventList;
 
-    // The [lastconnectionId] is only used when the user is hosting a server.
-    // It is used for setting a connected playar's [connection_id], used
+    // The [lastConnectionId] is only used when the user is hosting a server.
+    // It is used for setting a connected player's [connection_id], used
     // to identify and differentiate players more efficiently, each player who
     // connects will receive the [lastConnectionId] as it's [connection_id], then
     // the variable value will increase by one, wich will be used to set the id of
-    // another player who might connect.
+    // the next player who might connect.
     // .
     // Obs: The [lastConnectionId] must be set back to zero [0] when stop hosting a server!!
     static int lastConnectionId;
@@ -223,7 +222,7 @@ public:
     static bool isWsaInitialized();
 
     /**
-     * Sends a buffer of a event to the host or
+     * Sends a buffer of a event to the host, and
      * if you ARE THE HOST send to all the connected players.
      * 
      * every event must: 
@@ -234,7 +233,15 @@ public:
 
     static void sendEventTo(void* eventBuffer, SOCKET dest);
     static void manageConnections();
-    static bool hostServer();
+
+    /**
+     * Set the user's socket as a host, set it available for
+     * connections, and set the user's online status as SV_HOSTING.
+     * 
+     * @returns The port of the server's (user's) socket. If it returns 0
+     * it means it failed to host the server.
+     */
+    static int hostServer();
     bool joinServer(const char* ipAddress, int port);
 
     static void disconnect();

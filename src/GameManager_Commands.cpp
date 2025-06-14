@@ -1,4 +1,5 @@
 #include "GameManager.h"
+#include "scenes/Match.h"
 
 #include <sstream>
 
@@ -14,6 +15,9 @@ void GameManager::loadConsoleCommands(){
     console_commands.insert(std::make_pair("wsa_startup", [](std::vector<std::string> args)->void{
 
         // Initialize WinSock
+        if(isWsaInitialized()){
+            GM_LOG("WinSock is already initialized.");
+            return;}
         WSADATA wsaData;
         int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
         if(result != 0){
@@ -29,13 +33,27 @@ void GameManager::loadConsoleCommands(){
         disconnect();
         changeScene("lobby");
     }));
-
+    
     console_commands.insert(std::make_pair("course", [this](std::vector<std::string> args)->void{
         if(player.onlineStatus != SV_DISCONNECTED){
             GM_LOG("Can't load a map manually while connected to a server! (consider disconnecting)", LOG_ERROR);
             return;
         }
-        GM_LOG("TODO: implement system to load a 'hole/map file' from a specific course folder!", LOG_WARNING);
+
+        if(args.size() < 2){
+            GM_LOG("Too few arguments. This is the \"course\" command structure  >> \"course [couse_name_here] [map_name_here]\" ", LOG_ERROR);
+            return;
+        }
+
+        if(actual_scene_name == "match"){
+            scenes["match"]->unload();
+        }
+
+        if(((scene::Match*)scenes["match"])->loadCourse(args[0]) != 0){return;}
+        if(((scene::Match*)scenes["match"])->loadMap(args[1]) != 0){return;}
+
+        changeScene("match");
+
     }));
 
 }

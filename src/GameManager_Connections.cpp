@@ -131,12 +131,12 @@ void GameManager::manageConnections()
 
 // CONNECTION FUNCTIONS ====================== //
 
-bool GameManager::hostServer()
+int GameManager::hostServer()
 {   
     // If Winsock is not initialized, block the function. 
     if(!isWsaInitialized()){
         GM_LOG("Couldn't host a server: WinSock is not initialized.", LOG_ERROR);
-        return false;
+        return 0;
     }
 
     if(player.onlineStatus != SV_DISCONNECTED){return false;}
@@ -146,7 +146,7 @@ bool GameManager::hostServer()
 
     socketAddr.sin_family = AF_INET;
     socketAddr.sin_addr.s_addr = INADDR_ANY;
-    socketAddr.sin_port = htons(8080);
+    socketAddr.sin_port = htons(0); // let winsock choose a available port
 
     u_long mode = 1;
     ioctlsocket(player.m_socket, FIONBIO, &mode);
@@ -154,20 +154,29 @@ bool GameManager::hostServer()
     if(bind(player.m_socket, (sockaddr*)&socketAddr, sizeof(socketAddr))){
         std::cerr << "Error:["<< WSAGetLastError() << "] couldn't bind local address to the user's SOCKET. \n";
         disconnect();
-        return false;
+        return 0;
     }
+
+    // get the chosen port
+    sockaddr_in boundAddr;
+    int len = sizeof(boundAddr);
+    getsockname(player.m_socket, (sockaddr*)&boundAddr, &len);
+
+    GM_LOG("Server port:" + std::to_string(ntohs(boundAddr.sin_port)));
+    int port = ntohs(boundAddr.sin_port);
     
     if(listen(player.m_socket, 5)){
         std::cerr << "Error:["<< WSAGetLastError() << "] couldn't set SOCKET to listening state. \n";
         disconnect();
-        return false;
+        return 0;
     }
 
     player.onlineStatus = SV_HOSTING;
 
     std::thread connectionManagerThread(GameManager::manageConnections);
     connectionManagerThread.detach();
-    return true;
+
+    return port;
 }
 
 

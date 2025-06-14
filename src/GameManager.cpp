@@ -85,9 +85,28 @@ window(window),ui_FrameBuffer(800,600), screenVertexBuffer(nullptr, sizeof(float
     strcpy(actualCommand, "");
     loadConsoleCommands();
 
-    screenResolutions.push_back({
-        //TODO: Especify the dimensions of the resolutions
-    });
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if(result != 0){
+        std::cerr << "WSAStartup failed: " << result << std::endl;
+        GM_LOG("WSAStartup failed: " + std::to_string(result) + " <- error code", LOG_ERROR);
+        return;
+    }
+
+    // Screen ratios and resolutions ------------ //
+    // 4:3 - [0]
+    screenResolutions.push_back(
+        {{640, 480}, {800, 600}, {1024, 768}, {1280, 960}}
+    );
+    // 16:10 - [1]
+    screenResolutions.push_back(
+        {{1280, 800}, {1440, 900}, {1680, 1050}}
+    );
+    // 16:9 - [2]
+    screenResolutions.push_back(
+        {{854, 480}, {1280, 720}, {1600, 900}, {1920, 1080}}
+    );
+    // ---------------------------------------- //
 
 
     projection = glm::ortho(-2.0f, 2.0f, -1.5f, 1.5f, -1.0f, 1.0f);
@@ -172,7 +191,11 @@ void GameManager::addShader(Shader* shader)
 void GameManager::changeScene(std::string name)
 {
     if(scenes.find(name) != scenes.end()){
+        if(actualScene != nullptr){
+            actualScene->unload();
+        }
         actualScene = scenes[name];
+        actual_scene_name = name;
         actualScene->start();
         return;
     }

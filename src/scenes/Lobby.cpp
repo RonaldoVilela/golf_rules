@@ -1,5 +1,6 @@
 #include "Lobby.h"
 #include "GameManager.h"
+#include "scenes/Match.h"
 
 #include "imgui/imgui.h"
 #include <thread>
@@ -125,7 +126,7 @@ namespace scene{
 
         GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
         //Renderer::Draw(*va, *ib, *GameManager::activeShader);
-        Renderer::drawString("Soldier gaming",10, 30,{1.0f, 1.9f, 0.95f, 1.0f});
+        Renderer::drawString(std::to_string(serverPort),10, 30,{1.0f, 1.9f, 0.95f, 1.0f});
 
         manager->ui_FrameBuffer.Unbind();
     }
@@ -139,7 +140,7 @@ namespace scene{
         }
 
         if(ImGui::Button("Host server")){
-            manager->hostServer();
+            serverPort = manager->hostServer();
         }
 
         ImGui::InputText("ServerIp", serverIp, 15);
@@ -151,6 +152,7 @@ namespace scene{
 
         if(ImGui::Button("Disconnect")){
             manager->disconnect();
+            serverPort = 0;
         }
 
         switch(manager->player.onlineStatus){
@@ -176,7 +178,13 @@ namespace scene{
                 delete newEvent;
             }
             if(manager->player.onlineStatus != SV_CLIENT){
-                manager->changeScene("match");
+
+                //if none of the loading functions returns an error...
+                if( !(((scene::Match *)manager->scenes["match"])->loadCourse("db_testcourse") ||
+                ((scene::Match *)manager->scenes["match"])->loadMap("Untitled")))
+                {
+                    manager->changeScene("match");
+                }
             }
         }
         ImGui::End();

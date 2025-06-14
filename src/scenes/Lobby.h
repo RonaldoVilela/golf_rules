@@ -26,7 +26,7 @@ namespace scene{
         int onlinePlayers;
 
         char serverIp[15] = {};
-        int serverPort;
+        int serverPort = 0;
 
         VertexBuffer* vb;
         VertexBufferLayout* layout;

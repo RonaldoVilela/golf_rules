@@ -148,6 +148,7 @@ int main(){
                     
                     ImGui::SetNextItemWidth(-FLT_MIN);
                     if(ImGui::InputText("",gameManager.actualCommand, 126, ImGuiInputTextFlags_EnterReturnsTrue)){
+                        GM_LOG("> "+ (std::string)gameManager.actualCommand);
                         gameManager.execCommand(gameManager.actualCommand);
                         strcpy(gameManager.actualCommand, "");
                     }

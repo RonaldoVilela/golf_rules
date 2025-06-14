@@ -16,6 +16,7 @@ namespace scene{
         virtual ~Scene() {}
 
         virtual void start() {}
+        virtual void unload() {}
         virtual void OnUpdate(float deltaTime) {}
         virtual void OnRender() {}
         virtual void HandleEvents(GLFWwindow* window) {}

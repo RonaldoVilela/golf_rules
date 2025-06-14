@@ -21,6 +21,15 @@ namespace scene{
         void setAtive(bool active);
     };
 
+    struct WallGroup{
+        unsigned int texture_id;
+        std::vector<Wall> walls;
+        float top, bottom;
+        //IndexBuffer ib; //triangles
+        WallGroup(){};
+        void clearResources();
+    };
+
     enum ballStates{
         ON_GROUND = 0,
         ON_AIR = 1,
@@ -50,16 +59,52 @@ namespace scene{
         b2BodyId groundBodyId;
         Ball ball;
 
-        std::vector<Wall> walls;
+        std::vector<WallGroup> groups;
 
         float dragging;
         glm::vec4 startMouseWorldPos;
         glm::vec4 mouseWorldPos;
         glm::vec4 camPosOffset;
 
+        std::string actual_course = "";
+        std::vector<std::string> course_maps_played;
+
     public: 
         Match(GameManager* manager);
         ~Match();
+
+        /**
+         * Defines and loads a match course, if a course
+         * has been loaded before, it must be unloaded before
+         * calling this function.
+         * 
+         * @param courseName the course name, wich will be the name of the folder
+         * where it's information and maps will be.
+         * 
+         * @return - 0 if it was sucessfully loaded.
+         * @return - 1 if the couse folder was not found.
+         * @return - 2 if the course couldn't be loaded.
+         */
+        int loadCourse(std::string courseName);
+
+        /**
+         * Loads a map from the actual course's folder and stores it
+         * in a buffer of already played maps.
+         * 
+         * @attention This function by default loads a random map different from
+         * the maps already played before, passing a map name as the paramether
+         * loads that specific map, and doesn't add it to the "played maps buffer".
+         * 
+         * @param mapName name of a specific map from the course.
+         * 
+         * @return - 0 if it was sucessfully loaded.
+         * @return - 1 if the map file was not found.
+         * @return - 2 if an error occored while loading the file.
+         */
+        int loadMap(std::string mapName = nullptr);
+
+        void unloadMap();
+        void unload() override;
 
         void OnUpdate(float deltaTime) override;
         void OnRender() override;

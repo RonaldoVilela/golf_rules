@@ -16,6 +16,7 @@ public:
      * @param path the path of the image file
      */
     Texture(const std::string& path);
+    Texture(int width, int height, int bytesPerPixel, unsigned char* data);
     ~Texture();
 
     void Bind(unsigned int slot = 0) const;

@@ -15,22 +15,30 @@ namespace scene{
         serverPort = 0;
 
         float vertices[16] = {
-            -0.5f, -0.5f,   0.0f, 0.0f,
-            -0.5f, 0.5f,    0.0f, 1.0f,
-            0.5f, -0.5f,    1.0f, 0.0f,
+            -2.72f, -1.53f,   0.0f, 0.0f,
+            -2.72f, 1.53f,    0.0f, 1.0f,
+            2.72f, -1.53f,    1.0f, 0.0f,
             
-            0.5f, 0.5f,     1.0f, 1.0f
+            2.72f, 1.53f,     1.0f, 1.0f
         };
 
         unsigned int indices[6] = {
             0, 1, 2,
             1, 2, 3
         };
+        GameManager::getBinaryImages("defTextures.dat", &images);
 
+        std::cout << "now printing images.." << "\n";
+        for(auto i: images){
+            std::cout << i.first << "\n"; 
+        }
+        texture = new Texture(images["lobby.png"].width, images["lobby.png"].height, images["lobby.png"].m_bytesPerPixel, images["lobby.png"].m_data);
+        anon_texture = new Texture(images["specProf.png"].width, images["specProf.png"].height, images["specProf.png"].m_bytesPerPixel, images["specProf.png"].m_data);
         //texture = new Texture("res/textures/texture.png");
-        //texture->Bind();
+        texture->Bind();
+        std::cout << "texture created" << "\n"; 
 
-        vb = new VertexBuffer(nullptr, sizeof(float)*16, GL_DYNAMIC_DRAW);
+        vb = new VertexBuffer(vertices, sizeof(float)*16, GL_STATIC_DRAW);
         layout = new VertexBufferLayout();
         layout->Push<float>(2);
         layout->Push<float>(2);
@@ -62,6 +70,7 @@ namespace scene{
         delete layout;
         delete ib;
         delete va;
+        delete texture;
     }
 
     void Lobby::manageServerEvents()
@@ -93,7 +102,13 @@ namespace scene{
                     break;
 
                 case START_MATCH_EVENT:
-                    manager->changeScene("match");
+                    if( !(((scene::Match *)manager->scenes["match"])->loadCourse("db_testcourse") ||
+                    ((scene::Match *)manager->scenes["match"])->loadMap("Untitled")))
+                    {
+                        manager->changeScene("match");
+                    }else{
+                        manager->disconnect();
+                    }
                     break;
             }
             manager->eventList.pop();
@@ -117,16 +132,43 @@ namespace scene{
         GameManager::useShader(GM_FONT_SHADER);
         
 
+        texture->Bind();
+        GameManager::useShader(GM_TEXTURE_SHADER);
+        GameManager::activeShader->SetUniformMat4f("u_MVP", mvp);
+        Renderer::Draw(*va, *ib, *GameManager::activeShader);
+
         manager->ui_FrameBuffer.Bind();
 
-        //texture->Bind();
         GLCall(glActiveTexture(GL_TEXTURE0));
         GLCall(glBindTexture(GL_TEXTURE_2D, manager->font.textureID));
-    
 
+
+
+        GameManager::useShader(GM_FONT_SHADER);
         GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
-        //Renderer::Draw(*va, *ib, *GameManager::activeShader);
-        Renderer::drawString(std::to_string(serverPort),10, 30,{1.0f, 1.9f, 0.95f, 1.0f});
+        
+        Renderer::drawString(std::to_string(serverPort),10, 30,0.8f,{1.0f, 1.9f, 0.95f, 1.0f});
+
+        anon_texture->Bind();
+        GameManager::useShader(GM_TEXTURE_SHADER);
+        GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
+
+        Renderer::drawTextures(20, 20, 60, 60);
+        
+        int i = 0;
+        for(auto p: manager->connected_players){
+            Renderer::drawTextures(20, i*80 + (120), 60, 60);
+            i++;
+        }
+        GameManager::useShader(GM_FONT_SHADER);
+        GLCall(glActiveTexture(GL_TEXTURE0));
+        GLCall(glBindTexture(GL_TEXTURE_2D, manager->font.textureID));
+        
+        i = 0;
+        for(auto p: manager->connected_players){
+            Renderer::drawString(p.second.m_name, 100, i*80 + (160), 1.0f,{1.0f, 1.0f, 1.0f, 1.0f});
+            i++;
+        }
 
         manager->ui_FrameBuffer.Unbind();
     }

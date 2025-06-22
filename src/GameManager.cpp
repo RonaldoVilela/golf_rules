@@ -24,9 +24,6 @@ std::vector<Shader*> GameManager::shaders;
 Shader* GameManager::activeShader;
 
 FontAtlas GameManager::font;
-VertexBuffer* GameManager::textVertexBuffer;
-IndexBuffer* GameManager::textIndexBuffer;
-VertexArray* GameManager::textVertexArray;
 
 // ============================================== //
 
@@ -127,19 +124,9 @@ window(window),ui_FrameBuffer(800,600), screenVertexBuffer(nullptr, sizeof(float
     scenes.insert(std::make_pair("lobby",new scene::Lobby(this)));
     scenes.insert(std::make_pair("match",new scene::Match(this)));
 
-    /*
-        Load a dynamic vertexBuffer, wich can and will be used to store texts letter's vertices, for
-        later text rendering operations.
-    */
-    textVertexBuffer = new VertexBuffer(nullptr ,sizeof(float)*16*1000 ,GL_DYNAMIC_DRAW);
-    textIndexBuffer = new IndexBuffer(nullptr,6*1000);
-    textVertexArray = new VertexArray();
-
     VertexBufferLayout layout;
     layout.Push<float>(2);
     layout.Push<float>(2);
-    
-    textVertexArray->AddBuffer(*textVertexBuffer, layout);
 
     /*
         TODO: add the damn explanation
@@ -152,10 +139,11 @@ window(window),ui_FrameBuffer(800,600), screenVertexBuffer(nullptr, sizeof(float
         1.0f, -1.0f,    1.0f, 0.0f
     };
 
-    screenVertexArray.AddBuffer(screenVertexBuffer, layout);
-
     screenVertexBuffer.Bind();
     GLCall(glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)*16, screenVertex));
+    screenVertexArray.AddBuffer(screenVertexBuffer, layout);
+
+    
 }
 
 GameManager::~GameManager()
@@ -168,9 +156,6 @@ GameManager::~GameManager()
         closesocket(s);
         WSACleanup();
     }
-
-    
-    delete textVertexBuffer;
 
     //delete shapes
     delete circle;
@@ -210,6 +195,48 @@ void GameManager::useShader(int index)
     }
     shaders[index]->Bind();
     activeShader = shaders[index];
+}
+
+int GameManager::getBinaryImages(std::string dat_file, std::map<std::string, ImageData> *image_data_buffer)
+{
+    std::ifstream file("res/textures/"+ dat_file, std::ios::binary);
+    std::cout << "now loading dat file... \n";
+    if(file.is_open()){
+        int image_number = 0;
+        file.read((char*)&image_number, sizeof(int));
+
+        for(int i = 0; i < image_number; i++){
+            ImageData image_data;
+
+            int name_size = 0;
+            file.read((char*)&name_size, sizeof(int));
+             // image name lenght
+
+            char* name_buffer = (char*)malloc(name_size + 1);
+            file.read(name_buffer, name_size); // image name
+
+            name_buffer[name_size] = '\0';
+            std::string image_name(name_buffer);
+
+            free(name_buffer);
+
+
+            file.read((char*)&image_data.width, sizeof(int)); // width
+            file.read((char*)&image_data.height, sizeof(int)); // height
+            file.read((char*)&image_data.m_bytesPerPixel, sizeof(int)); // bytes per pixel
+            file.read((char*)&image_data.m_byteSize, sizeof(int)); // total byte size
+            image_data.m_data = (unsigned char*)malloc(image_data.m_byteSize);
+            file.read((char*)image_data.m_data, image_data.m_byteSize); // data
+
+            image_data_buffer->insert(std::make_pair(image_name, image_data));
+            
+        }
+        file.close();
+    }else{
+        std::cout << "Error: couldn't locate the .dat file: "<< dat_file << "\n";
+        return 1;
+    }
+    return 0;
 }
 
 void GameManager::drawUiFrameBuffer()

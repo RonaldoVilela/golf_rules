@@ -8,6 +8,7 @@ void GameManager::sendEvent(void* eventBuffer)
 
     if(player.onlineStatus == SV_HOSTING){
         for(auto p: connected_players){
+            if(p.first == 0){continue;}
             send(p.second.m_socket, (char*)eventBuffer, 256, 0);
         }
 
@@ -32,38 +33,45 @@ void GameManager::manageConnections()
 
             SOCKET clientSocket = accept(player.m_socket, nullptr, nullptr);
             if (clientSocket != INVALID_SOCKET){
-
+                
                 Player* newPlayer = (Player *)malloc(sizeof(Player));
-                lastConnectionId++;
+                if(std::strcmp(newPlayer->m_name, "DefaultName")){
 
-                recv(clientSocket, (char*)newPlayer, sizeof(Player),0);
-                newPlayer->m_socket = clientSocket;
-                newPlayer->connection_id = lastConnectionId;
-                std::cout << newPlayer->m_name << " joined the server! \n";
+                    
+                    lastConnectionId++;
+                    recv(clientSocket, (char*)newPlayer, sizeof(Player),0);
+                    newPlayer->m_socket = clientSocket;
+                    newPlayer->connection_id = lastConnectionId;
+                    
+                    std::cout << newPlayer->m_name << " joined the server! \n";
+                    GM_LOG(std::string(newPlayer->m_name) + " joined the crew!");
 
-                for(auto p: connected_players){
-                    AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, p.second.connection_id};
-                    strcpy(newEvent.m_string, p.second.m_name);
-                    //std::cout << newEvent->eventType << " :: " << newEvent->m_string << "\n";
-                    sendEventTo(&newEvent, clientSocket);
+                    for(auto p: connected_players){
+                        AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, p.second.connection_id};
+                        strcpy(newEvent.m_string, p.second.m_name);
+                        sendEventTo(&newEvent, clientSocket);
+                    }
+
+                    connected_players.insert(std::make_pair(newPlayer->connection_id,*newPlayer));
+                    
+
+                    AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, newPlayer->connection_id};
+                    strcpy(newEvent.m_string, newPlayer->m_name);
+                    sendEvent(&newEvent);
+                    
+
+                    delete newPlayer;
+                    std::cout << connected_players.at(lastConnectionId).m_name << "\n";
                 }
-
-                connected_players.insert(std::make_pair(newPlayer->connection_id,*newPlayer));
-                
-
-                AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, newPlayer->connection_id};
-                strcpy(newEvent.m_string, newPlayer->m_name);
-                sendEvent(&newEvent);
-                
-
-                delete newPlayer;
-                std::cout << connected_players.at(lastConnectionId).m_name << "\n";
             }
             
 
             
             for(auto i = connected_players.begin(); i != connected_players.end();){
-                
+                if((*i).first == 0){
+                    ++i;
+                    continue;
+                }
                 char buffer[256];
 
                 int infoLenght = recv((*i).second.m_socket, buffer, sizeof(buffer), 0);
@@ -79,15 +87,15 @@ void GameManager::manageConnections()
                     int err = WSAGetLastError();
                     if(err != WSAEWOULDBLOCK){
                         int playerConnId = (*i).second.connection_id;
+                        std::cerr << "A unexpected error ocurred on one of the sockets: " << err << "| player: ["<< connected_players.at((*i).first).m_name <<"]\n";
                         i = connected_players.erase(i);
-                        std::cerr << "A unexpected error ocurred on one of the sockets: " << err << "\n";
                         AbstractEvent event{PLAYER_DISCONNECTION_EVENT, playerConnId};
                         sendEvent(&event);
                         continue;
                     }
                 }
-                
                 ++i;
+                
             }
         }
         else if(player.onlineStatus == SV_CLIENT){
@@ -172,6 +180,8 @@ int GameManager::hostServer()
     }
 
     player.onlineStatus = SV_HOSTING;
+
+    connected_players.insert(std::make_pair(lastConnectionId, player));
 
     std::thread connectionManagerThread(GameManager::manageConnections);
     connectionManagerThread.detach();

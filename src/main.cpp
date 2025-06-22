@@ -90,10 +90,13 @@ int main(){
         GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
         GameManager gameManager(window);
+        Renderer::Init();
+        
         gameManager.updateScreenSize(window,1024, 768);
         gameManager.changeScene("lobby");
 
         glfwSetScrollCallback(window, GameManager::scroll_callback);
+        
         
         /* Loop until the user closes the window */
 

@@ -74,6 +74,12 @@ struct Dimension{
     int height;
 };
 
+struct ImageData{
+    int width, height;
+    int m_bytesPerPixel, m_byteSize;
+    unsigned char* m_data;
+};
+
 struct Bounds{
     float left;
     float right;
@@ -84,7 +90,7 @@ struct Bounds{
 
 struct Player{
     char m_name[24];
-    SOCKET m_socket;
+    SOCKET m_socket = INVALID_SOCKET;
     int onlineStatus;
     int connection_id;
 
@@ -131,22 +137,17 @@ public:
     static void log(std::string msg, int logType = 0);
     // ================================
 
-
-    // TEXT RENDERING ================== //
     static FontAtlas font;
-    static VertexBuffer* textVertexBuffer;
-    static IndexBuffer* textIndexBuffer;
-    static VertexArray* textVertexArray;
-    // ================================
-
 
     // RENDERING ====================== //
 
     // frameBuffer that will be used to draw Ui elements (uses window pixel position).
+
     FrameBuffer ui_FrameBuffer;
     void drawUiFrameBuffer();
 
     // default abstract shapes for debug rendering.
+
     shapes::Circle* circle;
     shapes::Square* square;
     shapes::Line* line;
@@ -163,6 +164,8 @@ public:
 
     void addShader(Shader* shader);
     static void useShader(int index);
+
+    static int getBinaryImages(std::string dat_file, std::map<std::string, ImageData>* image_data_buffer);
 
     // ==================================
 

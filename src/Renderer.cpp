@@ -18,8 +18,43 @@ bool GLLogCall(const char* function, const char* file, int line){
     return true;
 }
 
+VertexBuffer* Renderer::textVertexBuffer;
+IndexBuffer* Renderer::textIndexBuffer;
+VertexArray* Renderer::textVertexArray;
+
+VertexBuffer* Renderer::defaultVertexBuffer;
+IndexBuffer* Renderer::defaultIndexBuffer;
+VertexArray* Renderer::defaultVertexArray;
+
 void Renderer::Init()
 {
+    /*
+        Load a dynamic vertexBuffer, wich can and will be used to store texts letter's vertices, for
+        later text rendering operations.
+    */
+    textVertexBuffer = new VertexBuffer(nullptr ,sizeof(float)*16*1000 ,GL_DYNAMIC_DRAW);
+    textIndexBuffer = new IndexBuffer(nullptr,6*1000);
+    textVertexArray = new VertexArray();
+
+    VertexBufferLayout layout;
+    layout.Push<float>(2);
+    layout.Push<float>(2);
+    
+    textVertexArray->AddBuffer(*textVertexBuffer, layout);
+
+    // default buffers for rendering basic stuff, like rects ans texture quads.
+    defaultVertexBuffer = new VertexBuffer(nullptr ,sizeof(float)*16*1000 ,GL_DYNAMIC_DRAW);
+    defaultIndexBuffer = new IndexBuffer(nullptr,6*1000);;
+    defaultVertexArray = new VertexArray();
+
+    defaultVertexArray->AddBuffer(*defaultVertexBuffer, layout);
+}
+
+void Renderer::Close()
+{
+    delete textVertexBuffer;
+    delete textIndexBuffer;
+    delete textVertexArray;
 }
 
 void Renderer::Clear()
@@ -114,20 +149,24 @@ void Renderer::drawSegment(shapes::Line *line, float *vertices, unsigned int cou
     GLCall(glDrawArrays(GL_LINE_STRIP, 0, count));
 }
 
-void Renderer::drawString(std::string text,int x, int y, glm::vec4 color, int h_Align, int v_Align)
+
+void Renderer::drawString(std::string text,int x, int y, float scale, glm::vec4 color, int h_Align, int v_Align)
 {
     if(text.length() == 0){return;}
 
     float lastLetterAdvance = 0;
     for(int i = 0; i < text.length(); i++){
+        
+        Glyph actual_glyph = GameManager::font.glyphs[text[i]];
+
         float vertices[16] = {
-            0.0f + lastLetterAdvance + x, GameManager::font.glyphs[text[i]].height + y + GameManager::font.glyphs[text[i]].yoff,                                         GameManager::font.glyphs[text[i]].x0, GameManager::font.glyphs[text[i]].y1,
-            0.0f + lastLetterAdvance + x, 0.0f + y + GameManager::font.glyphs[text[i]].yoff,                                                                               GameManager::font.glyphs[text[i]].x0, GameManager::font.glyphs[text[i]].y0,
-            GameManager::font.glyphs[text[i]].width + lastLetterAdvance + x, GameManager::font.glyphs[text[i]].height + y + GameManager::font.glyphs[text[i]].yoff,    GameManager::font.glyphs[text[i]].x1, GameManager::font.glyphs[text[i]].y1,
+            0.0f + (lastLetterAdvance + x) * scale, (actual_glyph.height + y + actual_glyph.yoff) * scale,                      actual_glyph.x0, actual_glyph.y1,
+            0.0f + (lastLetterAdvance + x) * scale, 0.0f + (y + actual_glyph.yoff)*scale,                                       actual_glyph.x0, actual_glyph.y0,
+            (actual_glyph.width + lastLetterAdvance + x) * scale, (actual_glyph.height + y + actual_glyph.yoff) * scale,        actual_glyph.x1, actual_glyph.y1,
             
-            GameManager::font.glyphs[text[i]].width + lastLetterAdvance + x, 0.0f + y + GameManager::font.glyphs[text[i]].yoff,                                           GameManager::font.glyphs[text[i]].x1, GameManager::font.glyphs[text[i]].y0
+            (actual_glyph.width + lastLetterAdvance + x) * scale, 0.0f + (y + actual_glyph.yoff) * scale,                       actual_glyph.x1, actual_glyph.y0
         };
-        lastLetterAdvance += GameManager::font.glyphs[text[i]].xadvance;
+        lastLetterAdvance += actual_glyph.xadvance;
 
         unsigned int vertexIndexOffset = i*4;
 
@@ -136,14 +175,37 @@ void Renderer::drawString(std::string text,int x, int y, glm::vec4 color, int h_
             1 + vertexIndexOffset, 2 + vertexIndexOffset, 3 + vertexIndexOffset
         };
 
-        GameManager::textVertexBuffer->Bind();
+        textVertexBuffer->Bind();
         glBufferSubData(GL_ARRAY_BUFFER, i*sizeof(float)* 16, sizeof(float)* 16, vertices);
 
-        GameManager::textIndexBuffer->Bind();
+        textIndexBuffer->Bind();
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, i*6*sizeof(unsigned int), sizeof(unsigned int)* 6, indices);
     }
 
     GameManager::useShader(GM_FONT_SHADER);
     GameManager::activeShader->SetUniform4f("u_Color", color.x, color.y, color.z, color.w);
-    Draw(*GameManager::textVertexArray, *GameManager::textIndexBuffer, text.length()*6, *GameManager::activeShader);
+    Draw(*textVertexArray, *textIndexBuffer, text.length()*6, *GameManager::activeShader);
+}
+
+void Renderer::drawTextures(float x, float y, float w, float h)
+{
+    float vertices[16] = {
+        x, y,       0.0f, 1.0f,
+        x+w, y,     1.0f, 1.0f,
+        x, y+h,     0.0f, 0.0f,
+        
+        x+w, y+h,   1.0f, 0.0f,
+        
+    };
+    unsigned int indices[6]{
+        0,1,2,
+        1,2,3
+    };
+    defaultVertexBuffer->Bind();
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float)* 16, vertices);
+
+    defaultIndexBuffer->Bind();
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(unsigned int)* 6, indices);
+
+    Draw(*defaultVertexArray, *defaultIndexBuffer, 6, *GameManager::activeShader);
 }

@@ -11,6 +11,8 @@
 #include <map>
 #include <vector>
 
+struct ImageData;
+
 namespace scene{
     
     struct LobbyEvent{
@@ -28,12 +30,17 @@ namespace scene{
         char serverIp[15] = {};
         int serverPort = 0;
 
+        //WARNING: temporary code -------- //
+        std::map<std::string, ImageData> images;
         VertexBuffer* vb;
         VertexBufferLayout* layout;
 
         IndexBuffer* ib;
 
         VertexArray* va;
+        Texture* texture;
+        Texture* anon_texture;
+        // ------------------------------- //
 
         glm::mat4 view;
         glm::mat4 model;

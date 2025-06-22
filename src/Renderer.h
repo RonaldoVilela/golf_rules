@@ -20,17 +20,33 @@ namespace shapes{
 void GLClearError();
 bool GLLogCall(const char* function, const char* file, int line);
 
-namespace Renderer{
+class Renderer{
+private:
+    // TEXT RENDERING ================== //
+    static VertexBuffer* textVertexBuffer;
+    static IndexBuffer* textIndexBuffer;
+    static VertexArray* textVertexArray;
+    // ================================
 
-    void Init();
-    void Clear();
-    void Draw(const VertexArray& va, const IndexBuffer& ib, const Shader& shader);
-    void Draw(const VertexArray& va, const IndexBuffer& ib, unsigned int indiciesCount, const Shader& shader);
-    void drawShape(shapes::Shape* shape, float x, float y, float w_scale, float h_scale, float rotation, glm::vec4 color);
-    void drawShape(shapes::Shape* shape, float x, float y, float scale, glm::vec4 color);
+    // default buffers for rendering conventional elements such as Rects and Textures 
+    //
+    static VertexBuffer* defaultVertexBuffer;
+    static IndexBuffer* defaultIndexBuffer;
+    static VertexArray* defaultVertexArray;
+public:
+    static void Init();
+    static void Close();
 
-    void drawLine(shapes::Line* line, float pos1[2], float pos2[2], glm::vec4 color);
-    void drawSegment(shapes::Line* line, float* vertices, unsigned int count, glm::vec4 color);
+    static void Clear();
+    static void Draw(const VertexArray& va, const IndexBuffer& ib, const Shader& shader);
+    static void Draw(const VertexArray& va, const IndexBuffer& ib, unsigned int indiciesCount, const Shader& shader);
+    static void drawShape(shapes::Shape* shape, float x, float y, float w_scale, float h_scale, float rotation, glm::vec4 color);
+    static void drawShape(shapes::Shape* shape, float x, float y, float scale, glm::vec4 color);
 
-    void drawString(std::string text,int x, int y,glm::vec4 color, int h_Align = 0, int v_Align = 0);
-}
+    static void drawLine(shapes::Line* line, float pos1[2], float pos2[2], glm::vec4 color);
+    static void drawSegment(shapes::Line* line, float* vertices, unsigned int count, glm::vec4 color);
+
+    static void drawString(std::string text,int x, int y, float scale ,glm::vec4 color, int h_Align = 0, int v_Align = 0);
+
+    static void drawTextures(float x, float y, float w, float h);
+};

@@ -31,7 +31,7 @@ void GameManager::loadConsoleCommands(){
 
     console_commands.insert(std::make_pair("disconnect", [this](std::vector<std::string> args)->void{
         disconnect();
-        changeScene("lobby");
+        changeScene("server_list");
     }));
     
     console_commands.insert(std::make_pair("course", [this](std::vector<std::string> args)->void{

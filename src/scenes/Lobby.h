@@ -27,9 +27,6 @@ namespace scene{
         bool everyoneReady;
         int onlinePlayers;
 
-        char serverIp[15] = {};
-        int serverPort = 0;
-
         //WARNING: temporary code -------- //
         std::map<std::string, ImageData> images;
         VertexBuffer* vb;
@@ -50,11 +47,14 @@ namespace scene{
         float scale;
         
         glm::mat4 mvp;
+        
+        void manageServerEvents();
+
+        //WARNING: This function creation is quite a questionable decision.
+        void serverUpdate();
     public: 
         Lobby(GameManager* manager);
         ~Lobby();
-
-        void manageServerEvents();
 
         void start() override;
         void OnUpdate(float deltaTime) override;

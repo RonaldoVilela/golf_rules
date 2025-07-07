@@ -99,6 +99,62 @@ struct Player{
     }
 };
 
+/**
+ * This struct is used to store essencial informations about the server.
+ * 
+ * If the player is not connect to a server, the actual ServerInfo should just get
+ * invalidated (ServerInfo.invalidate()).
+ */
+struct ServerInfo{
+
+    bool valid = false; // Defines if the server is valid or not (Duhh)
+
+    std::string m_name = "LAN server";
+    std::string server_address;
+    int m_port = 0;
+    std::string actual_course = "";
+    int online_players = 0;
+    int playerId_1 = -1, playerId_2 = -1; // connection id of the competiting players
+
+    /**
+     * This socket is only initialized if you are hosting a server.
+     * 
+     * It will be used to detect other user's search requests on the local network
+     * and respond with the actual ServerInfo data [ getServerInfo() ].
+     * 
+     * OBS: Notice that this is a UDP socket, so it can send and read data
+     * from broadcast, differently from TCP sockets (used by the players).
+     */
+    SOCKET udp_socket;
+
+    /**
+     * Set the server port, initializes it's UDP socket and validates the server.
+     * This function will be usually used just when hosting a new server.
+     */
+    void start(int server_port);
+
+    void invalidate();
+
+    /**
+     * Set the actual ServerInfo values acoording to the binary data passed
+     * as paramether.
+     * 
+     * @param data The data wich will be read.
+     * @attention This data paramether should be created by another ServerInfo, using the [ getServerInfo() ] function.
+     */
+    bool setServerInfo(char* data);
+
+    /**
+     * Transform the actual ServerInfo values into a char array, wich can be used
+     * in the [ setServerInfo(char* data) ] function of another ServerInfo.
+     * 
+     * @returns The actual ServerInfo data as a character array
+     */
+    char* getServerInfo(int players_online);
+};
+
+//TODO: find a better way of declaring those structs
+
 class GameManager{
 private:
 
@@ -179,7 +235,7 @@ public:
     Bounds screenBounds;
 
     /**
-     * Updates the GL_Viewport, the stored window dimention, and
+     * Updates the GL_Viewport, the stored window dimension, and
      * automatically defines a screen ratio acoording to the new 
      * window size.
      * 
@@ -208,9 +264,14 @@ public:
     // CONNECTION ==================== //
     /* functions in here will be defined in: GameManager_Connections.cpp */
 
-    static Player player;
+    static ServerInfo actual_server;            // actual server data
+    static Player player;                       // user/player's data
+
+    static const int DISCOVERY_PORT = 8080;     // fixed discovery port (might run into some problems)
+
     static std::map<int , Player> connected_players;
     static std::queue<std::array<char, 256>> eventList;
+
 
     // The [lastConnectionId] is only used when the user is hosting a server.
     // It is used for setting a connected player's [connection_id], used
@@ -218,7 +279,7 @@ public:
     // connects will receive the [lastConnectionId] as it's [connection_id], then
     // the variable value will increase by one, wich will be used to set the id of
     // the next player who might connect.
-    // .
+    // 
     // Obs: The [lastConnectionId] must be set back to zero [0] when stop hosting a server!!
     static int lastConnectionId;
 
@@ -241,11 +302,19 @@ public:
      * Set the user's socket as a host, set it available for
      * connections, and set the user's online status as SV_HOSTING.
      * 
+     * @param server_name the name of the server (Leave empty to give a default name)
      * @returns The port of the server's (user's) socket. If it returns 0
      * it means it failed to host the server.
      */
-    static int hostServer();
+    static int hostServer(std::string server_name = std::string(player.m_name) + "'s Server");
+
+    /**
+     * Obs: This function automatically calls disconnect() when it fails.
+     */
     bool joinServer(const char* ipAddress, int port);
 
+    ServerInfo searchServer();
+
     static void disconnect();
+    // =============================
 };

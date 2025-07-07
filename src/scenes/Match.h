@@ -49,6 +49,12 @@ namespace scene{
         void onGroundContact();
     };
 
+    enum MatchRoles{
+        ESPECTATOR = 0,
+        PLAYER_1 = 1,
+        PLAYER_2 = 2,
+    };
+
     class Match : public Scene{
     private:
         glm::vec4 camPos;
@@ -69,6 +75,9 @@ namespace scene{
         std::string actual_course = "";
         std::vector<std::string> course_maps_played;
 
+        void manageMatchEvents();
+        int player_role = 0;
+
     public: 
         Match(GameManager* manager);
         ~Match();
@@ -84,7 +93,7 @@ namespace scene{
          * @return - 0 if it was sucessfully loaded.
          * @return - 1 if the couse folder was not found.
          * @return - 2 if the course couldn't be loaded.
-         */
+         **/
         int loadCourse(std::string courseName);
 
         /**
@@ -106,6 +115,7 @@ namespace scene{
         void unloadMap();
         void unload() override;
 
+        void start() override;
         void OnUpdate(float deltaTime) override;
         void OnRender() override;
 

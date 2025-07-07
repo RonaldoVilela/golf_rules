@@ -72,7 +72,7 @@ int main(){
 
     std::cout << glGetString(GL_VERSION) << "\n";
 
-    { // um escopo extra só pra garantir que as classes sejam destruídas antes do OpenGl fechar
+    { // extra scope to make sure the classes destructors are called before OpenGL closes.
         
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -93,7 +93,7 @@ int main(){
         Renderer::Init();
         
         gameManager.updateScreenSize(window,1024, 768);
-        gameManager.changeScene("lobby");
+        gameManager.changeScene("server_list");
 
         glfwSetScrollCallback(window, GameManager::scroll_callback);
         

@@ -9,10 +9,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "scenes/Lobby.h"
 #include "scenes/Match.h"
+#include "scenes/ServerList.h"
 
 // ============================================== //
 
 float GameManager::scrollFactor = 0;
+
+ServerInfo GameManager::actual_server;
 Player GameManager::player;
 int GameManager::lastConnectionId = 0;
 std::map<int, Player> GameManager::connected_players;
@@ -123,6 +126,7 @@ window(window),ui_FrameBuffer(800,600), screenVertexBuffer(nullptr, sizeof(float
 
     scenes.insert(std::make_pair("lobby",new scene::Lobby(this)));
     scenes.insert(std::make_pair("match",new scene::Match(this)));
+    scenes.insert(std::make_pair("server_list",new scene::ServerList(this)));
 
     VertexBufferLayout layout;
     layout.Push<float>(2);
@@ -248,3 +252,5 @@ void GameManager::drawUiFrameBuffer()
     activeShader->SetUniformMat4f("u_MVP", projection);
     Renderer::Draw(screenVertexArray, screenIndexBuffer, *activeShader);
 }
+
+

@@ -3,6 +3,7 @@
 
 #include "imgui/imgui.h"
 #include <fstream>
+#include <sstream>
 
 namespace scene{
     void Wall::setAtive(bool active)
@@ -66,6 +67,74 @@ namespace scene{
         b2Body_SetLinearDamping(bodyId, 1.0f);
     }
 
+    void Match::manageMatchEvents()
+    {
+        while(manager->eventList.size() > 0){
+
+            
+            std::array<char, 256> temp = manager->eventList.front();
+            char eventBuffer[256];
+            std::memcpy(eventBuffer, temp.data(), 256);
+
+            AbstractEvent* event = (AbstractEvent*)eventBuffer;
+            int eventType = event->eventType;
+
+            if(manager->player.onlineStatus == SV_CLIENT){
+                switch(eventType){
+                    case SERVER_CLOSED_EVENT:
+                            manager->disconnect();
+                        break;
+                    case PLAYER_CONNECTION_EVENT: 
+                        {
+                            Player newPlayer;
+                            strcpy(newPlayer.m_name, event->m_string);
+                            newPlayer.connection_id = event->m_flag;
+                            manager->connected_players.insert(std::make_pair(newPlayer.connection_id, newPlayer));
+                            GM_LOG(std::string(newPlayer.m_name) + " joined the crew!");
+                        }
+                        break;
+                    
+                    case SERVER_INFO_UPDATE_EVENT:
+                        GameManager::actual_server.setServerInfo(&eventBuffer[sizeof(int)]);
+                        break;
+
+                    case PLAYER_DISCONNECTION_EVENT:
+                        GM_LOG(std::string(manager->connected_players.at(event->m_flag).m_name) + " left the room");
+                        manager->connected_players.erase(event->m_flag);
+                        break;
+
+                }
+            }else{
+                switch(eventType){
+                    case MATCH_MAP_REQUEST:
+                        std::cout << "received the map request\n";
+                        int player_conn_id = eventBuffer[sizeof(int)];
+                        std::ostringstream data_buffer(std::ios::binary);
+                        int map_index = course_maps_played.size() - 1;
+
+                        int type = MATCH_MAP_RESPONSE;
+                        data_buffer.write((char*)&type,sizeof(int));
+
+                        // course name
+                        int size = actual_course.size();
+                        data_buffer.write((char*)&size,sizeof(int));
+                        data_buffer.write(actual_course.c_str(),size);
+
+                        // hole name
+                        size = course_maps_played[map_index].size();
+                        data_buffer.write((char*)&size,sizeof(int));
+                        data_buffer.write(course_maps_played[map_index].c_str(),size);
+
+                        //send(manager->connected_players[player_conn_id].m_socket, data_buffer.str().data(), 256, 0); // directly send the names
+                        manager->sendEventTo(data_buffer.str().data(), manager->connected_players[player_conn_id].m_socket);
+                        break;
+                }
+            }
+            manager->eventList.pop();
+            std::cout << "Received one event here\n";
+        };
+    }
+
     Match::Match(GameManager *manager) : Scene(manager)
     {
         camPos = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -85,116 +154,22 @@ namespace scene{
         b2DestroyWorld(worldId);
     }
 
-    // LOAD AND UNLOAD FILES ========================= //
-
-    int Match::loadCourse(std::string courseName)
+    void Match::start()
     {
-        actual_course = courseName;
-        return 0;
-    }
-
-    int Match::loadMap(std::string mapName)
-    {
-        if(actual_course.length() == 0){
-            GM_LOG("Error loading Map: Can't load a map without loading it's course folder first! >> returns: 1",LOG_ERROR);
-            return 1;
-        }
-
-        std::ifstream file("res/maps/"+ actual_course+"/"+mapName+".grm", std::ios::binary);
-
-        if(file.is_open()){
-            // Box2d world setup --------- //
-            b2WorldDef worldDef;
-            worldDef = b2DefaultWorldDef();
-            worldDef.gravity = (b2Vec2){0.0f, 0.0f};
-
-            worldId = b2CreateWorld(&worldDef);
-
-            b2BodyDef groundBodyDef = b2DefaultBodyDef();
-            groundBodyDef.position = (b2Vec2){-1.8f, -3.0f};
-            groundBodyDef.rotation = b2MakeRot(1.0f);
-
-            groundBodyId = b2CreateBody(worldId, &groundBodyDef);
-
-            b2Polygon groundBox = b2MakeBox(1.5f, 1.5f);
-            b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-            groundShapeDef.isSensor = true;
-            b2CreatePolygonShape(groundBodyId, &groundShapeDef, &groundBox); 
-
-            ball.loadBody(worldId);
-            //----------------------------- //
-
-
-            std::cout << "size of b2Vec2: "<<sizeof(b2Vec2) << "; \n";
-            std::cout << "size of float: "<<sizeof(float) << "\n";
-
-            // reading file data here: >>>>>>>>>>
-
-            int groupCount = 0;
-            file.read((char*)&groupCount, sizeof(int));
-
-            for(int i = 0; i < groupCount; i++){
-                
-                groups.push_back(WallGroup());
-                std::cout << "Creating group: "<< i <<"\n";
-                int wallCount = 0;
-                file.read((char*)&wallCount, sizeof(int));
-                 std::cout << "Group "<< i << " have " << wallCount << " walls .\n";
-
-                for(int w = 0; w < wallCount; w++){
-                    std::cout << "Creating wall "<< w << " of the group: "<< i <<"\n";
-                    //read the segment data
-                    //order: pont1 | point2 | inclination | tan | is_tall
-                    Wall newWall;
-                    file.read((char*)&newWall.point1, sizeof(b2Vec2));
-                    file.read((char*)&newWall.point2, sizeof(b2Vec2));
-
-                    file.read((char*)&newWall.inclination, sizeof(int));
-                    file.read((char*)&newWall.tan, sizeof(float));
-                    file.read((char*)&newWall.tall, sizeof(bool));
-
-                    groups[i].walls.push_back(newWall);
-
-                    // Create box2d body
-                    b2BodyDef segmentBodyDef = b2DefaultBodyDef();
-                    groups[i].walls[w].segmentId = b2CreateBody(worldId, &segmentBodyDef);
-
-                    b2ShapeDef segmentShapeDef = b2DefaultShapeDef();
-                    b2Segment segment = {groups[i].walls[w].point1, groups[i].walls[w].point2};
-
-                    groups[i].walls[w].shapeId = b2CreateSegmentShape(groups[i].walls[w].segmentId, &segmentShapeDef, &segment);
-                }
-                std::cout << "Created all walls from group: "<< i <<"\n";
-            }
-            file.close();
-            return 0;
-        }else{
-            GM_LOG("Error loading Map: Couldn't find the map file: ["+ mapName +".grm] in the folder of the course ["+actual_course+"] >> returns: 1",LOG_ERROR);
-            return 1;
+        player_role = ESPECTATOR;
+        if(manager->player.connection_id == GameManager::actual_server.playerId_1){
+            player_role = PLAYER_1;
+        }else if(manager->player.connection_id == GameManager::actual_server.playerId_2){
+            player_role = PLAYER_2;
         }
     }
-
-    void Match::unloadMap()
-    {
-        b2DestroyWorld(worldId);
-        for(WallGroup g: groups){
-            g.clearResources();
-        }
-        groups.clear();
-    }
-
-    void Match::unload()
-    {
-        unloadMap();
-
-        actual_course = "";
-        course_maps_played.clear();
-        GM_LOG("Match resources cleared.");
-    }
-    // ----------------------------------------- //
 
     void Match::OnUpdate(float deltaTime)
     {
+        if(manager->player.onlineStatus != SV_DISCONNECTED){
+            manageMatchEvents();
+        }
+
         zoom += GameManager::scrollFactor * deltaTime;
         if(zoom < 0.1f){zoom = 0.1f;}
         if(zoom > 3.0f){zoom = 3.0f;}
@@ -239,6 +214,25 @@ namespace scene{
         Renderer::drawShape(manager->square, b2Body_GetPosition(groundBodyId).x, b2Body_GetPosition(groundBodyId).y, 3.0f, 3.0f, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f});
 
         Renderer::drawShape(manager->square, mouseWorldPos.x, mouseWorldPos.y, 0.2f, 0.2f, 0.0f, {1.0f, 1.0f, 1.0f, 1.0f});
+
+        manager->ui_FrameBuffer.Bind();
+
+        GLCall(glActiveTexture(GL_TEXTURE0));
+        GLCall(glBindTexture(GL_TEXTURE_2D, manager->font.textureID));
+
+        GameManager::useShader(GM_FONT_SHADER);
+        GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
+
+        switch(player_role){
+            case ESPECTATOR: Renderer::drawString("[Espectating...]", 0, 20,0.6f, {1.0f, 1.0f, 1.0f, 1.0f});
+                break;
+            case PLAYER_1: Renderer::drawString("[Player 1]", 0, 20,0.6f, {0.0f, 0.0f, 1.0f, 1.0f});
+                break;
+            case PLAYER_2: Renderer::drawString("[Player 2]", 0, 20,0.6f, {1.0f, 0.0f, 0.0f, 1.0f});
+                break;
+        }
+        
+        manager->ui_FrameBuffer.Unbind();
         
     }
 

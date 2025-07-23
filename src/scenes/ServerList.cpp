@@ -65,8 +65,9 @@ namespace scene{
                 local_servers.push_back(info);
             }
 
-            
         }
+        
+        ImGui::Text("Servers found:");
 
         for(int i = 0; i < local_servers.size(); i++){
             ImGui::BeginChild(local_servers[i].m_name.c_str(), ImVec2(220, 100), true);
@@ -79,9 +80,6 @@ namespace scene{
 
             ImGui::EndChild();
         }
-
-
-        ImGui::Text("Servers found:");
 
         ImGui::End();
     }

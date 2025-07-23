@@ -108,6 +108,11 @@ int main(){
         {
             
             glfwPollEvents();
+            
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+            if (width <= 0 || height <= 0) {continue;}
+
             gameManager.handleEvents(window);
             processInput(window);
             gameManager.actualScene->HandleEvents(window);
@@ -193,7 +198,9 @@ int main(){
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
-    glViewport(0, 0, width, height);
+    if(width > 0 && height > 0){
+        glViewport(0, 0, width, height);
+    }
 }
 
 void processInput(GLFWwindow* window){

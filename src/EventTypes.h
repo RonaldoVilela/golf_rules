@@ -1,17 +1,22 @@
 #pragma once
 
-enum eventTypes{
-    SERVER_CLOSED_EVENT = 0,
-    SERVER_INFO_REQUEST_EVENT = 1,
-    SERVER_INFO_UPDATE_EVENT = 2,
+namespace game_event{
+    enum {
+        INVALID = -1,
+        SERVER_CLOSED = 0,
+        SERVER_INFO_REQUEST = 1,
+        SERVER_INFO_UPDATE = 2,
 
-    PLAYER_CONNECTION_EVENT = 3,
-    PLAYER_DISCONNECTION_EVENT = 4,
-    PLAYER_ID_SET_EVENT = 5,
+        PLAYER_CONNECTION = 3,
+        PLAYER_DISCONNECTION = 4,
+        PLAYER_ID_SET = 5,
 
-    START_MATCH_EVENT = 6,
+        START_MATCH = 6,
 
-    MATCH_MAP_REQUEST = 7,
-    MATCH_MAP_RESPONSE = 8,
-    MATCH_HOLE_CHANGE_EVENT = 9,
-};
+        MATCH_MAP_REQUEST = 7,
+        MATCH_MAP_RESPONSE = 8,
+        MATCH_HOLE_CHANGE = 9,
+
+        MATCH_FORCED_TERMINATION = 10,
+    };
+}

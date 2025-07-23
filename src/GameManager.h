@@ -33,6 +33,7 @@
 #include <winsock2.h>
 
 #include "EventTypes.h"
+#include "GameEvent.h"
 
 enum shaderType{
     GM_BASIC_SHADER = 0,
@@ -129,7 +130,7 @@ struct ServerInfo{
 
     /**
      * Set the server port, initializes it's UDP socket and validates the server.
-     * This function will be usually used just when hosting a new server.
+     * @warning: this function should only be used when HOSTING the server.
      */
     void start(int server_port);
 
@@ -142,7 +143,7 @@ struct ServerInfo{
      * @param data The data wich will be read.
      * @attention This data paramether should be created by another ServerInfo, using the [ getServerInfo() ] function.
      */
-    bool setServerInfo(char* data);
+    bool setServerInfo(const char* data);
 
     /**
      * Transform the actual ServerInfo values into a char array, wich can be used
@@ -150,7 +151,7 @@ struct ServerInfo{
      * 
      * @returns The actual ServerInfo data as a character array
      */
-    char* getServerInfo(int players_online);
+    std::string getServerInfo(int players_online);
 };
 
 //TODO: find a better way of declaring those structs
@@ -293,9 +294,9 @@ public:
      *  - start with a event_type (int);
      *  - not be bigger than 256 bytes;
      */
-    static void sendEvent(void* eventBuffer);
+    static void sendEvent(const void* eventBuffer);
 
-    static void sendEventTo(void* eventBuffer, SOCKET dest);
+    static void sendEventTo(const void* eventBuffer, SOCKET dest);
     static void manageConnections();
 
     /**

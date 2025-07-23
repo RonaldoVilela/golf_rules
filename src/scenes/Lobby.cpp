@@ -11,9 +11,9 @@ namespace scene{
     void Lobby::serverUpdate()
     {
         std::ostringstream connection_event_buffer(std::ios::binary);
-        int event_type = SERVER_INFO_UPDATE_EVENT;
+        int event_type = game_event::SERVER_INFO_UPDATE;
         connection_event_buffer.write((char*)&event_type, sizeof(int));
-        connection_event_buffer.write(GameManager::actual_server.getServerInfo(manager->connected_players.size()), 250);
+        connection_event_buffer.write(GameManager::actual_server.getServerInfo(manager->connected_players.size()).data(), 250);
 
         manager->sendEvent(connection_event_buffer.str().data());
     }
@@ -86,88 +86,102 @@ namespace scene{
     {
         while(manager->eventList.size() > 0 && manager->player.onlineStatus == SV_CLIENT){
 
-            std::array<char, 256> temp = manager->eventList.front();
-            char eventBuffer[256];
-            std::memcpy(eventBuffer, temp.data(), 256);
-
-            AbstractEvent* event = (AbstractEvent*)eventBuffer;
-            int eventType = event->eventType;
+            GameEvent event(manager->eventList.front().data());
                 
-            switch(eventType){
-                case SERVER_CLOSED_EVENT:
+            switch(event.getType()){
+                case game_event::SERVER_CLOSED:
+                        GM_LOG("Server was closed", LOG_WARNING);
                         manager->disconnect();
+                        manager->changeScene("server_list");
                     break;
-                case PLAYER_CONNECTION_EVENT: 
+                case game_event::PLAYER_CONNECTION: 
                     {
                         Player newPlayer;
-                        strcpy(newPlayer.m_name, event->m_string);
-                        newPlayer.connection_id = event->m_flag;
+
+                        int name_size = event.readInt();
+                        std::cout << "Name lenght: " << name_size << "\n";
+                        char *name = (char*)malloc(name_size + 1);
+                        name[name_size] = '\0';
+
+                        event.readData(name,name_size);
+
+                        std::cout << "Name: " << name << "\n";
+                        strcpy(newPlayer.m_name, name);
+
+                        newPlayer.connection_id = event.readInt();
+                        std::cout << "Id: " << newPlayer.connection_id << "\n";
                         manager->connected_players.insert(std::make_pair(newPlayer.connection_id, newPlayer));
+
                         GM_LOG(std::string(newPlayer.m_name) + " joined the crew!");
                     }
                     break;
                 
-                case SERVER_INFO_UPDATE_EVENT:
-                    GameManager::actual_server.setServerInfo(&eventBuffer[sizeof(int)]);
+                case game_event::SERVER_INFO_UPDATE:
+                    GameManager::actual_server.setServerInfo(event.readData(250));
                     break;
 
-                case PLAYER_DISCONNECTION_EVENT:
-                    GM_LOG(std::string(manager->connected_players.at(event->m_flag).m_name) + " left the room");
-                    manager->connected_players.erase(event->m_flag);
-                    break;
-
-                case START_MATCH_EVENT:
-                    if( !(((scene::Match *)manager->scenes["match"])->loadCourse("db_testcourse") ||
-                    ((scene::Match *)manager->scenes["match"])->loadMap("Untitled")))
+                case game_event::PLAYER_DISCONNECTION:
                     {
-                        manager->changeScene("match");
-                    }else{
-                        manager->disconnect();
+                        int disconnected_player_id = event.readInt();
+
+                        GM_LOG(std::string(manager->connected_players.at(disconnected_player_id).m_name) + " left the room");
+                        manager->connected_players.erase(disconnected_player_id);
                     }
                     break;
 
-                case MATCH_MAP_RESPONSE:
-                    // wait for the response:
+                case game_event::START_MATCH:
+                    if(((scene::Match *)manager->scenes["match"])->loadCourse("db_testcourse")){
+                        manager->disconnect();
+                        return;
+                    }
+                    if(((scene::Match *)manager->scenes["match"])->loadMap("Untitled")){
+                        manager->disconnect();
+                        return;
+                    }
+                     manager->changeScene("match");
+                    break;
+
+                case game_event::MATCH_MAP_RESPONSE:
 
                     std::cout << "Received the file names here :D \n";
 
-                    int size = 0;
-                    int buffer_position = sizeof(int);
+                    {
+                        int size = 0;
+                        int buffer_position = 0;
 
-                    memcpy(&size, &eventBuffer[buffer_position], sizeof(int)); // course name lenght
-                    buffer_position += sizeof(int);
+                        size = event.readInt();
+                        //memcpy(&size, &eventBuffer[buffer_position], sizeof(int)); // course name lenght
+                        //buffer_position += sizeof(int);
 
-                    char* name_buffer = (char*)malloc(size + 1);
-                    name_buffer[size] = '\0';
+                        char* name_buffer = (char*)malloc(size + 1);
+                        name_buffer[size] = '\0';
+                        event.readData(name_buffer, size);
 
-                    memcpy(name_buffer, &eventBuffer[buffer_position], size); // course name
-                    buffer_position += size;
+                        //memcpy(name_buffer, &eventBuffer[buffer_position], size); // course name
+                        //buffer_position += size;
 
-                    if(((scene::Match *)manager->scenes["match"])->loadCourse(name_buffer)){
-                        manager->disconnect();
-                        break;
+                        if(((scene::Match *)manager->scenes["match"])->loadCourse(name_buffer)){
+                            manager->disconnect();
+                            break;
+                        }
+                        std::cout << "loaded course \n";
+                        free(name_buffer);
+
+                        size = event.readInt();
+
+                        name_buffer = (char*)malloc(size + 1);
+                        name_buffer[size] = '\0';
+                        event.readData(name_buffer, size);
+
+                        if(((scene::Match *)manager->scenes["match"])->loadMap(name_buffer)){
+                            manager->disconnect();
+                            break;
+                        }
+                        std::cout << "Loaded map \n";
+                        free(name_buffer);
+
+                        manager->changeScene("match");
                     }
-                    std::cout << "loaded course \n";
-                    free(name_buffer);
-
-                    memcpy(&size, &eventBuffer[buffer_position], sizeof(int)); // hole name lenght
-                    buffer_position += sizeof(int);
-
-                    name_buffer = (char*)malloc(size + 1);
-                    name_buffer[size] = '\0';
-
-                    memcpy(name_buffer, &eventBuffer[buffer_position], size); // hole name
-                    buffer_position += size;
-
-                    if(((scene::Match *)manager->scenes["match"])->loadMap(name_buffer)){
-                        manager->disconnect();
-                        break;
-                    }
-                    std::cout << "Loaded map \n";
-
-                    free(name_buffer);
-
-                    manager->changeScene("match");
                     break;
             }
             manager->eventList.pop();
@@ -264,6 +278,18 @@ namespace scene{
         if(manager->player.onlineStatus == SV_HOSTING){
             if(ImGui::InputInt("Player 1", &GameManager::actual_server.playerId_1,1,100,ImGuiInputTextFlags_EnterReturnsTrue) ||
             ImGui::InputInt("Player 2", &GameManager::actual_server.playerId_2,1,100,ImGuiInputTextFlags_EnterReturnsTrue)){
+
+                if(manager->connected_players.find(GameManager::actual_server.playerId_1) == manager->connected_players.end()){
+                    GameManager::actual_server.playerId_1 = -1;
+                }
+                if(manager->connected_players.find(GameManager::actual_server.playerId_2) == manager->connected_players.end()){
+                    GameManager::actual_server.playerId_2 = -1;
+                }
+
+                if(GameManager::actual_server.playerId_1 == GameManager::actual_server.playerId_2){
+                    GameManager::actual_server.playerId_2 = -1;
+                }
+
                 serverUpdate();
             }
         }
@@ -278,11 +304,10 @@ namespace scene{
             }
         }
 
-        if(ImGui::Button("start game")){
-            if(manager->player.onlineStatus == SV_HOSTING){
-                AbstractEvent* newEvent = new AbstractEvent{START_MATCH_EVENT};
-                manager->sendEvent(newEvent);
-                delete newEvent;
+        if(manager->player.onlineStatus == SV_HOSTING && ImGui::Button("start game")){
+            if(GameManager::actual_server.playerId_1 >= 0 && GameManager::actual_server.playerId_2 >= 0){
+                GameEvent event(game_event::START_MATCH);
+                manager->sendEvent(event.getData());
 
                 //if none of the loading functions returns an error...
                 if( !(((scene::Match *)manager->scenes["match"])->loadCourse("db_testcourse") ||
@@ -291,6 +316,8 @@ namespace scene{
                     manager->changeScene("match");
                     GameManager::actual_server.actual_course = "db_testcourse";
                 }
+            }else{
+                GM_LOG("Not enought players to start the match", LOG_WARNING);
             }
         }
         ImGui::End();

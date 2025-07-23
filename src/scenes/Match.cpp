@@ -3,7 +3,6 @@
 
 #include "imgui/imgui.h"
 #include <fstream>
-#include <sstream>
 
 namespace scene{
     void Wall::setAtive(bool active)
@@ -73,60 +72,75 @@ namespace scene{
 
             
             std::array<char, 256> temp = manager->eventList.front();
-            char eventBuffer[256];
-            std::memcpy(eventBuffer, temp.data(), 256);
 
-            AbstractEvent* event = (AbstractEvent*)eventBuffer;
-            int eventType = event->eventType;
+            GameEvent event(temp.data());
 
             if(manager->player.onlineStatus == SV_CLIENT){
-                switch(eventType){
-                    case SERVER_CLOSED_EVENT:
+                switch(event.getType()){
+
+                    case game_event::SERVER_CLOSED:
                             manager->disconnect();
                         break;
-                    case PLAYER_CONNECTION_EVENT: 
+
+                    case game_event::PLAYER_CONNECTION: 
                         {
+
                             Player newPlayer;
-                            strcpy(newPlayer.m_name, event->m_string);
-                            newPlayer.connection_id = event->m_flag;
+
+                            int name_size = event.readInt();
+                            char *name = (char*)malloc(name_size + 1);
+                            name[name_size] = '\0';
+
+                            event.readData(name,name_size);
+
+                            strcpy(newPlayer.m_name, name);
+
+                            newPlayer.connection_id = event.readInt();
                             manager->connected_players.insert(std::make_pair(newPlayer.connection_id, newPlayer));
+
                             GM_LOG(std::string(newPlayer.m_name) + " joined the crew!");
                         }
                         break;
                     
-                    case SERVER_INFO_UPDATE_EVENT:
-                        GameManager::actual_server.setServerInfo(&eventBuffer[sizeof(int)]);
+                    case game_event::SERVER_INFO_UPDATE:
+                        GameManager::actual_server.setServerInfo(event.readData(256-sizeof(int)));
                         break;
 
-                    case PLAYER_DISCONNECTION_EVENT:
-                        GM_LOG(std::string(manager->connected_players.at(event->m_flag).m_name) + " left the room");
-                        manager->connected_players.erase(event->m_flag);
+                    case game_event::PLAYER_DISCONNECTION:
+                        {
+                            int disconnected_player_id = event.readInt();
+                            GM_LOG(std::string(manager->connected_players.at(disconnected_player_id).m_name) + " left the room");
+                            manager->connected_players.erase(disconnected_player_id);
+                        }
+                        break;
+                    case game_event::MATCH_FORCED_TERMINATION:
+                        {
+                            manager->changeScene("lobby");
+                        }
                         break;
 
                 }
-            }else{
-                switch(eventType){
-                    case MATCH_MAP_REQUEST:
-                        std::cout << "received the map request\n";
-                        int player_conn_id = eventBuffer[sizeof(int)];
-                        std::ostringstream data_buffer(std::ios::binary);
-                        int map_index = course_maps_played.size() - 1;
+            }
+            else{ // if is hosting
 
-                        int type = MATCH_MAP_RESPONSE;
-                        data_buffer.write((char*)&type,sizeof(int));
+                switch(event.getType()){
+                    case game_event::MATCH_MAP_REQUEST:
+                    
+                        std::cout << "received the map request\n";
+                        int player_conn_id = event.readInt();
+
+                        GameEvent responseEvent(game_event::MATCH_MAP_RESPONSE);
 
                         // course name
-                        int size = actual_course.size();
-                        data_buffer.write((char*)&size,sizeof(int));
-                        data_buffer.write(actual_course.c_str(),size);
+
+                        responseEvent.pushData((int)actual_course.size());
+                        responseEvent.pushData(actual_course.data(),(int)actual_course.size());
 
                         // hole name
-                        size = course_maps_played[map_index].size();
-                        data_buffer.write((char*)&size,sizeof(int));
-                        data_buffer.write(course_maps_played[map_index].c_str(),size);
+                        responseEvent.pushData((int)course_maps_played.back().size());
+                        responseEvent.pushData(course_maps_played.back().data(), (int)course_maps_played.back().size());
 
-                        //send(manager->connected_players[player_conn_id].m_socket, data_buffer.str().data(), 256, 0); // directly send the names
-                        manager->sendEventTo(data_buffer.str().data(), manager->connected_players[player_conn_id].m_socket);
+                        manager->sendEventTo(responseEvent.getData(), manager->connected_players[player_conn_id].m_socket);
                         break;
                 }
             }
@@ -143,15 +157,13 @@ namespace scene{
         zoom = 1.0f;
         view = glm::translate(glm::mat4(1.0f), {camPos.x + camPosOffset.x, camPos.y + camPosOffset.y, 0.0f}) * glm::scale(glm::mat4(1.0f),glm::vec3(zoom, zoom, 1.0f));
 
-        //WARNING: This is a temporary code, a map and couse should NEVER be loaded in the Match class constructor;
-        //loadCourse("db_testcourse");
-        //loadMap("Untitled");
-        
     }
 
     Match::~Match()
     {
-        b2DestroyWorld(worldId);
+        if(resources_loaded){
+            b2DestroyWorld(worldId);
+        }
     }
 
     void Match::start()
@@ -169,6 +181,7 @@ namespace scene{
         if(manager->player.onlineStatus != SV_DISCONNECTED){
             manageMatchEvents();
         }
+        if(!resources_loaded){return;}
 
         zoom += GameManager::scrollFactor * deltaTime;
         if(zoom < 0.1f){zoom = 0.1f;}
@@ -224,11 +237,11 @@ namespace scene{
         GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
 
         switch(player_role){
-            case ESPECTATOR: Renderer::drawString("[Espectating...]", 0, 20,0.6f, {1.0f, 1.0f, 1.0f, 1.0f});
+            case ESPECTATOR: Renderer::drawString("[Espectating...]", 0, 20,0.8f, {1.0f, 1.0f, 1.0f, 1.0f});
                 break;
-            case PLAYER_1: Renderer::drawString("[Player 1]", 0, 20,0.6f, {0.0f, 0.0f, 1.0f, 1.0f});
+            case PLAYER_1: Renderer::drawString("[Player 1]", 0, 20,0.8f, {0.0f, 0.0f, 1.0f, 1.0f});
                 break;
-            case PLAYER_2: Renderer::drawString("[Player 2]", 0, 20,0.6f, {1.0f, 0.0f, 0.0f, 1.0f});
+            case PLAYER_2: Renderer::drawString("[Player 2]", 0, 20,0.8f, {1.0f, 0.0f, 0.0f, 1.0f});
                 break;
         }
         

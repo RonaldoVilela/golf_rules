@@ -78,6 +78,8 @@ namespace scene{
         void manageMatchEvents();
         int player_role = 0;
 
+        bool resources_loaded = false;
+
     public: 
         Match(GameManager* manager);
         ~Match();

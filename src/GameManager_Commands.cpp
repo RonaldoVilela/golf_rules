@@ -56,6 +56,22 @@ void GameManager::loadConsoleCommands(){
 
     }));
 
+    console_commands.insert(std::make_pair("end_match", [this](std::vector<std::string> args)->void{
+        
+        if(player.onlineStatus == SV_CLIENT){
+            GM_LOG("You don't have the permission to end a match!", LOG_ERROR);
+            return;
+        }
+        if(actual_scene_name != "match"){
+            GM_LOG("Can't cancel a inexisting match...");
+            return;
+        }
+
+        changeScene("lobby");
+        GameEvent event(game_event::MATCH_FORCED_TERMINATION);
+        sendEvent(event.getData());
+    }));
+
 }
 void GameManager::execCommand(std::string command){
     std::stringstream ss(command);

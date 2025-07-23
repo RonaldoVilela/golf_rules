@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <thread>
 #include "GLFW/glfw3.h"
 

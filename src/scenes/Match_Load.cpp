@@ -90,6 +90,7 @@ namespace scene{
             file.close();
 
             course_maps_played.push_back(mapName);
+            resources_loaded = true;
             return 0;
         }else{
             GM_LOG("Error loading Map: Couldn't find the map file: ["+ mapName +".grm] in the folder of the course ["+actual_course+"] >> returns: 1",LOG_ERROR);
@@ -104,6 +105,7 @@ namespace scene{
             g.clearResources();
         }
         groups.clear();
+        resources_loaded = false;
     }
 
     void Match::unload()
@@ -113,6 +115,8 @@ namespace scene{
         actual_course = "";
         course_maps_played.clear();
         GM_LOG("Match resources cleared.");
+
+        resources_loaded = false;
     }
     // ----------------------------------------- //
 

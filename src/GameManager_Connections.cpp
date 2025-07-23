@@ -1,10 +1,10 @@
 #include "GameManager.h"
 #include "scenes/Match.h"
 #include <thread>
-#include <sstream>
 #include <ws2tcpip.h>
 
-
+#define DISCOVERY_MESSAGE "SERVER_INFO_REQUEST"
+#define DISCOVERY_RESPONSE_MSG "SERVER_INFO_RESPONSE"
 
 // SERVER STRUCT'S FUNCTION DEFINITION =============== //
 
@@ -15,6 +15,9 @@ void ServerInfo::start(int server_port)
 
     //initialize UDP socket
     udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+    int yes = 1;
+    setsockopt(udp_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
 
     // Enable broadcast
     BOOL bOpt = TRUE;
@@ -54,13 +57,15 @@ void ServerInfo::invalidate()
 }
 
 // Server info >>
-bool ServerInfo::setServerInfo(char *data)
+bool ServerInfo::setServerInfo(const char *data)
 {
+    std::cout << "[setting the server info from data]" << '\n';
     int buffer_position = 0;
 
     int size = 0;
-    memcpy((char*)&size, &data[buffer_position], sizeof(int)); // 1 - server name lenght
+    memcpy(&size, &data[buffer_position], sizeof(int)); // 1 - server name lenght
     buffer_position += sizeof(int);
+    std::cout << "Read server name size: " << size << " | position: " << buffer_position << '\n';
 
     char* name_buffer = (char*)malloc(size + 1);
     name_buffer[size] = '\0';
@@ -69,13 +74,17 @@ bool ServerInfo::setServerInfo(char *data)
 
     free(name_buffer);
     buffer_position += size;
+    std::cout << "Read server name: " << m_name << " | position: " << buffer_position << '\n';
 
-    memcpy((char*)&m_port, &data[buffer_position], sizeof(int)); // 3 - server port
+    memcpy(&m_port, &data[buffer_position], sizeof(int)); // 3 - server port
     buffer_position += sizeof(int);
 
+    std::cout << "Read server port: " << m_port << " | position: " << buffer_position << '\n';
 
-    memcpy((char*)&size, &data[buffer_position], sizeof(int)); // 4 - server address lenght
+
+    memcpy(&size, &data[buffer_position], sizeof(int)); // 4 - server address lenght
     buffer_position += sizeof(int);
+    std::cout << "Read server address lenght: " << size << " | position: " << buffer_position << '\n';
 
     name_buffer = (char*)malloc(size + 1);
     name_buffer[size] = '\0';
@@ -84,13 +93,17 @@ bool ServerInfo::setServerInfo(char *data)
 
     free(name_buffer);
     buffer_position += size;
+    std::cout << "Read server address: " << server_address << " | position: " << buffer_position << '\n';
 
-
-    memcpy((char*)&online_players, &data[buffer_position], sizeof(int)); // 6 - number of online players
+    memcpy(&online_players, &data[buffer_position], sizeof(int)); // 6 - number of online players
     buffer_position += sizeof(int);
 
-    memcpy((char*)&size, &data[buffer_position], sizeof(int)); // 7 - course name lenght
+    std::cout << "Read number of online players: " << online_players << " | position: " << buffer_position << '\n';
+
+    memcpy(&size, &data[buffer_position], sizeof(int)); // 7 - course name lenght
     buffer_position += sizeof(int);
+
+    std::cout << "Read server course name lenght: " << size << " | position: " << buffer_position << '\n';
 
     char* course_name_buffer = (char*)malloc(size + 1);
     course_name_buffer[size] = '\0';
@@ -100,45 +113,65 @@ bool ServerInfo::setServerInfo(char *data)
     free(course_name_buffer);
     buffer_position += size;
 
-    memcpy((char*)&playerId_1, &data[buffer_position], sizeof(int)); // 9 - player 1
+    std::cout << "Read server course name: " << actual_course << " | position: " << buffer_position << '\n';
+
+    memcpy(&playerId_1, &data[buffer_position], sizeof(int)); // 9 - player 1
     buffer_position += sizeof(int);
 
-    memcpy((char*)&playerId_2, &data[buffer_position], sizeof(int)); // 10 - player 2
+    memcpy(&playerId_2, &data[buffer_position], sizeof(int)); // 10 - player 2
     buffer_position += sizeof(int);
+
+    std::cout << "Read server players of the round: " << playerId_1 << ":"<< playerId_2 << " | position: " << buffer_position << '\n';
 
     valid = true;
+    std::cout << "[setted server info] Final buffer position: "<< buffer_position << '\n';
     return true;
 }
 
-char *ServerInfo::getServerInfo(int players_online)
+std::string ServerInfo::getServerInfo(int players_online)
 {
+    std::cout << "[getting server info size]" << '\n';
     std::ostringstream server_info_buffer(std::ios::binary);
     int size = m_name.size();
+
     server_info_buffer.write((char*)&size, sizeof(int)); // 1 - server name lenght
+    std::cout << "Written name size (int): " << server_info_buffer.str().size() << '\n';
+
     server_info_buffer.write(m_name.c_str(), size); // 2 - server name
+    std::cout << "Written name with size: " << m_name.size() << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
     server_info_buffer.write((char*)&m_port, sizeof(int)); // 3 - server port
+    std::cout << "Written server port(int): " << 4 << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
     size = server_address.size();
     server_info_buffer.write((char*)&size, sizeof(int)); // 4 - server address lenght
+    std::cout << "Written address lenght (int): " << 4 << " | Total Size: " << server_info_buffer.str().size() << '\n';
     server_info_buffer.write(server_address.c_str(), size); // 5 - server address
+    std::cout << "Written address with size: " << server_address.size() << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
     server_info_buffer.write((char*)&players_online, sizeof(int)); // 6 - number of online players
+    std::cout << "Written number of online players(int): " << 4 << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
     size = actual_course.length();
     server_info_buffer.write((char*)&size, sizeof(int)); // 7 - course name lenght
+    std::cout << "Written course name lenght(int): " << 4 << " | Total Size: " << server_info_buffer.str().size() << '\n';
+
     server_info_buffer.write(actual_course.c_str(), size); // 8 - actual course name
+    std::cout << "Written course name with size: " << actual_course.size() << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
     server_info_buffer.write((char*)&playerId_1, sizeof(int)); // 9 - player 1
     server_info_buffer.write((char*)&playerId_2, sizeof(int)); // 10 - player 2
+    std::cout << "Written p1 and p2 id (2x int): " << 8 << " | Total Size: " << server_info_buffer.str().size() << '\n';
 
-    return server_info_buffer.str().data();
+    std::cout << "[server info buffer completed] Total server Info size: " << server_info_buffer.str().size() << '\n';
+
+    return server_info_buffer.str();
 }
 
 // ------------------------------- //
 
 // CONNECTION COMUNICATION FUNCTIONS ================= //
-void GameManager::sendEvent(void* eventBuffer)
+void GameManager::sendEvent(const void* eventBuffer)
 {
     if(player.onlineStatus == SV_DISCONNECTED){return;}
 
@@ -154,7 +187,7 @@ void GameManager::sendEvent(void* eventBuffer)
     send(player.m_socket, (char*)eventBuffer, 256, 0);
 }
 
-void GameManager::sendEventTo(void* eventBuffer, SOCKET dest)
+void GameManager::sendEventTo(const void* eventBuffer, SOCKET dest)
 {
     if(player.onlineStatus == SV_DISCONNECTED){return;}
 
@@ -199,12 +232,13 @@ void GameManager::manageConnections()
                 }
 
                 buffer[broad_data_lenght] = '\0';
-                if (strcmp(buffer, "SERVER_INFO_REQUEST") == 0) {
+                if (strcmp(buffer, DISCOVERY_MESSAGE) == 0) {
                     std::ostringstream server_response(std::ios::binary);
-                    server_response.write("SERVER_INFO_RESPONSE", 21);
-                    server_response.write(GameManager::actual_server.getServerInfo(connected_players.size()), 229);
+                    server_response.write(DISCOVERY_RESPONSE_MSG, 20);
+                    //GameManager::actual_server.setServerInfo(GameManager::actual_server.getServerInfo(connected_players.size()));
+                    server_response.write(GameManager::actual_server.getServerInfo(connected_players.size()).data(), 256 - 20);
 
-                    sendto(actual_server.udp_socket, server_response.str().data(), server_response.str().size(), 0, (sockaddr*)&clientAddr, len);
+                    sendto(actual_server.udp_socket, server_response.str().data(), server_response.str().size(), 0, (sockaddr*)&clientAddr, sizeof(clientAddr));
                     std::cout << "[Server] Client discovered server!" << std::endl;
                 }
             }
@@ -218,44 +252,51 @@ void GameManager::manageConnections()
                 char received_data[256];
                 recv(clientSocket, received_data, 256,0);
 
-                int event_type = 0;
-                std::memcpy((char*)&event_type, received_data, sizeof(int));
+                GameEvent event(received_data);
 
-                if(event_type == PLAYER_CONNECTION_EVENT){
-                    // Add new connected player
-                    Player* newPlayer = (Player *)malloc(sizeof(Player));
+                // Add new connected player
+                Player* newPlayer = (Player *)malloc(sizeof(Player));
 
-                    std::memcpy((char*)newPlayer, &received_data[sizeof(int)], sizeof(Player));
+                std::memcpy((char*)newPlayer, &received_data[sizeof(int)], sizeof(Player));
 
-                    newPlayer->m_socket = clientSocket;
-                    newPlayer->connection_id = lastConnectionId;
+                newPlayer->m_socket = clientSocket;
+                newPlayer->connection_id = lastConnectionId;
 
-                    // send the player's connection id
-                    std::ostringstream connection_event_buffer(std::ios::binary);
-                    connection_event_buffer.write((char*)&newPlayer->connection_id, sizeof(int));
-                    connection_event_buffer.write(GameManager::actual_server.getServerInfo(connected_players.size()), 250);
-                    send(clientSocket,connection_event_buffer.str().data(),256,0);
-                    
-                    std::cout << newPlayer->m_name << " joined the server! \n";
-                    GM_LOG(std::string(newPlayer->m_name) + " joined the crew!");
+                // send the player's connection id
+                std::ostringstream connection_event_buffer(std::ios::binary);
+                connection_event_buffer.write((char*)&newPlayer->connection_id, sizeof(int));
+                connection_event_buffer.write(GameManager::actual_server.getServerInfo(connected_players.size()).data(), 256-sizeof(int));
 
-                    for(auto p: connected_players){
-                        AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, p.second.connection_id};
-                        strcpy(newEvent.m_string, p.second.m_name);
-                        sendEventTo(&newEvent, clientSocket);
-                    }
+                send(clientSocket,connection_event_buffer.str().data(),256,0);
+                
+                std::cout << newPlayer->m_name << " joined the server! \n";
+                GM_LOG(std::string(newPlayer->m_name) + " joined the crew!");
 
-                    connected_players.insert(std::make_pair(newPlayer->connection_id,*newPlayer));
-                    
+                for(auto p: connected_players){
 
-                    AbstractEvent newEvent{PLAYER_CONNECTION_EVENT, newPlayer->connection_id};
-                    strcpy(newEvent.m_string, newPlayer->m_name);
-                    sendEvent(&newEvent);
-                    
+                    GameEvent newEvent(game_event::PLAYER_CONNECTION);
+                    newEvent.pushData((int)strlen(p.second.m_name));
+                    newEvent.pushData(p.second.m_name, (int)strlen(p.second.m_name));
+                    newEvent.pushData(p.first);
 
-                    delete newPlayer;
-                    std::cout << connected_players.at(lastConnectionId).m_name << "\n";
+                    sendEventTo(newEvent.getData(), clientSocket);
                 }
+
+                connected_players.insert(std::make_pair(newPlayer->connection_id,*newPlayer));
+                
+
+                //AbstractEvent newEvent{game_event::PLAYER_CONNECTION, newPlayer->connection_id};
+                //strcpy(newEvent.m_string, newPlayer->m_name);
+                GameEvent newEvent(game_event::PLAYER_CONNECTION);
+                    newEvent.pushData((int)strlen(newPlayer->m_name));
+                    newEvent.pushData(newPlayer->m_name, (int)strlen(newPlayer->m_name));
+                    newEvent.pushData(newPlayer->connection_id);
+                sendEvent(newEvent.getData());
+                
+
+                delete newPlayer;
+                std::cout << connected_players.at(lastConnectionId).m_name << "\n";
+                
             }
             
 
@@ -284,8 +325,11 @@ void GameManager::manageConnections()
                     std::cout << (*i).second.m_name<< " left the server \n";
                     int playerConnId = (*i).second.connection_id;
                     i = connected_players.erase(i);
-                    AbstractEvent event{PLAYER_DISCONNECTION_EVENT, playerConnId};
-                    sendEvent(&event);
+
+                    GameEvent event(game_event::PLAYER_DISCONNECTION);
+                    event.pushData(playerConnId);
+                    sendEvent(event.getData());
+
                     continue;
                 }else if(infoLenght < 0){
                     int err = WSAGetLastError();
@@ -293,7 +337,7 @@ void GameManager::manageConnections()
                         int playerConnId = (*i).second.connection_id;
                         std::cerr << "A unexpected error ocurred on one of the sockets: " << err << "| player: ["<< connected_players.at((*i).first).m_name <<"]\n";
                         i = connected_players.erase(i);
-                        AbstractEvent event{PLAYER_DISCONNECTION_EVENT, playerConnId};
+                        AbstractEvent event{game_event::PLAYER_DISCONNECTION, playerConnId};
                         sendEvent(&event);
                         continue;
                     }
@@ -439,7 +483,7 @@ bool GameManager::joinServer(const char *ipAddress ,int port)
     // send to the server the user's "Player" struct (GameManager.h) data, witch contains it's name, and online status:
 
     std::ostringstream event_buffer(std::ios::binary);
-    int eventType = PLAYER_CONNECTION_EVENT;
+    int eventType = game_event::PLAYER_CONNECTION;
     event_buffer.write((char*)&eventType, sizeof(int));
     event_buffer.write((char*)&player, sizeof(Player));
 
@@ -453,13 +497,20 @@ bool GameManager::joinServer(const char *ipAddress ,int port)
 
     event_buffer.str("");
 
+    std::cout << "ganna receive server info and id \n";
     // get it's connection id and updated server info:
     char data_buffer[256];
-    recv(player.m_socket, data_buffer,256, 0); // receive the connection id and the updated server information
-    memcpy(&player.connection_id, data_buffer, sizeof(int)); // connection id
-    GameManager::actual_server.setServerInfo(&data_buffer[sizeof(int)]); // server info
+    if(recv(player.m_socket, data_buffer,256, 0) > 0){ // receive the connection id and the updated server information
+        memcpy(&player.connection_id, data_buffer, sizeof(int)); // connection id
+        GameManager::actual_server.setServerInfo(&data_buffer[sizeof(int)]); // server info
+    }else{
+        GM_LOG("Error: [" + std::to_string(WSAGetLastError()) + "] couldn't receive the socket conection id or information from server.", LOG_ERROR);
+        std::cout << "Error: [" << std::to_string(WSAGetLastError()) << "] couldn't receive the socket conection id or information from server.\n";
+        disconnect();
+        return false;
+    }
 
-
+    std::cout << "ok until now.. \n";
 
     player.onlineStatus = SV_CLIENT; // set the user's online status as: CLIENT, since it's joining a server.
 
@@ -467,12 +518,12 @@ bool GameManager::joinServer(const char *ipAddress ,int port)
 
     // if the server is in mid match, send a request for the course folder name and hole file name:
     if(GameManager::actual_server.actual_course.size() > 0){ // (course name empty = not in game)
-        eventType = MATCH_MAP_REQUEST;
-        event_buffer.write((char*)&eventType, sizeof(int));
-        event_buffer.write((char*)&player.connection_id, sizeof(int));
+        
+        GameEvent event(game_event::MATCH_MAP_REQUEST);
+        event.pushData(player.connection_id);
         
 
-        sendEvent(event_buffer.str().data());
+        sendEvent(event.getData());
         std::cout << "Sended the request \n";
 
     }
@@ -509,8 +560,7 @@ ServerInfo GameManager::searchServer()
 
     // resquest the servers information via broadcast.
 
-    const char* discoverMsg = "SERVER_INFO_REQUEST";
-    sendto(udp_socket, discoverMsg, strlen(discoverMsg), 0, (sockaddr*)&udpAddr, sizeof(udpAddr));
+    sendto(udp_socket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (sockaddr*)&udpAddr, sizeof(udpAddr));
     GM_LOG("Sent discovery request on broadcast.", LOG_WARNING);
 
     // wait for response.
@@ -518,10 +568,11 @@ ServerInfo GameManager::searchServer()
     sockaddr_in serverAddr{};
     int len = sizeof(serverAddr);
     int recvLen = recvfrom(udp_socket, buffer, sizeof(buffer), 0, (sockaddr*)&serverAddr, &len);
-    buffer[recvLen] = '\0';
+
+    std::cout << "[received response] lenght of the data received: " << recvLen << '\n';
     //GM_LOG("Received request response.", LOG_WARNING);
 
-    if(recvLen < 0){
+    if(recvLen <= 0){
         int err = WSAGetLastError();
         if(err == WSAETIMEDOUT){
             GM_LOG("No local servers were found :(");
@@ -536,14 +587,15 @@ ServerInfo GameManager::searchServer()
     
 
     char received_message[21];
-    memcpy(received_message, buffer, 21);
+    memcpy(received_message, buffer, 20);
     received_message[20] = '\0'; // just in case
-    if(std::strcmp(received_message, "SERVER_INFO_RESPONSE")){
+    if(std::strcmp(received_message, DISCOVERY_RESPONSE_MSG)){
         GM_LOG("Read a non-response data from broadcast!", LOG_WARNING);
         return server_found;
     }
 
-    server_found.setServerInfo(&buffer[21]);
+    std::cout << "Now the data received will be read>> \n";
+    server_found.setServerInfo(&buffer[20]);
 
     return server_found;
 }
@@ -557,8 +609,8 @@ void GameManager::disconnect()
         If the user is the host, send a event, telling every connection(connected users)
         that the host is disconnected and force them to disconnect as well.
         */
-        AbstractEvent newEvent{SERVER_CLOSED_EVENT};
-        sendEvent(&newEvent);
+        GameEvent event(game_event::SERVER_CLOSED);
+        sendEvent(event.getData());
     }
 
 

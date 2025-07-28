@@ -84,6 +84,8 @@ window(window),ui_FrameBuffer(800,600), screenVertexBuffer(nullptr, sizeof(float
     strcpy(actualCommand, "");
     loadConsoleCommands();
 
+    soloud.init();
+
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if(result != 0){

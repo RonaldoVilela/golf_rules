@@ -35,6 +35,8 @@
 #include "EventTypes.h"
 #include "GameEvent.h"
 
+#include "soloud.h"
+
 enum shaderType{
     GM_BASIC_SHADER = 0,
     GM_FONT_SHADER = 1,
@@ -247,6 +249,10 @@ public:
      */
     void updateScreenSize(GLFWwindow* window, int width, int height);
 
+    // ===========================
+
+    // SOUNDS ====================
+    SoLoud::Soloud soloud; // Engine core
     // ===========================
 
 

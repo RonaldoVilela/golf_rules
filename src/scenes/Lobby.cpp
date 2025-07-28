@@ -23,18 +23,8 @@ namespace scene{
         everyoneReady = false;
         onlinePlayers = 0;
 
-        float vertices[16] = {
-            -2.72f, -1.53f,   0.0f, 0.0f,
-            -2.72f, 1.53f,    0.0f, 1.0f,
-            2.72f, -1.53f,    1.0f, 0.0f,
-            
-            2.72f, 1.53f,     1.0f, 1.0f
-        };
+        sample.load("res/sound/effect.wav"); // Load a wave file
 
-        unsigned int indices[6] = {
-            0, 1, 2,
-            1, 2, 3
-        };
         GameManager::getBinaryImages("defTextures.dat", &images);
 
         std::cout << "now printing images.." << "\n";
@@ -47,6 +37,19 @@ namespace scene{
         texture->Bind();
         std::cout << "texture created" << "\n"; 
 
+        float vertices[16] = {
+            -2.72f, -1.53f,   0.0f, 0.0f,
+            -2.72f, 1.53f,    0.0f, 1.0f,
+            2.72f, -1.53f,    1.0f, 0.0f,
+            
+            2.72f, 1.53f,     1.0f, 1.0f
+        };
+
+        unsigned int indices[6] = {
+            0, 1, 2,
+            1, 2, 3
+        };
+        
         vb = new VertexBuffer(vertices, sizeof(float)*16, GL_STATIC_DRAW);
         layout = new VertexBufferLayout();
         layout->Push<float>(2);
@@ -320,10 +323,23 @@ namespace scene{
                 GM_LOG("Not enought players to start the match", LOG_WARNING);
             }
         }
+
+        if(ImGui::Button("play sound")){
+            int handle = manager->soloud.play(sample);
+            static int num = 0;
+            if(num == 0){
+                num = 1;
+            }else{
+                num = 0;
+            }
+            manager->soloud.setRelativePlaySpeed(handle,(num) ? 0.7f : 1.2f);
+            std::cout << "Played sound: " << num << "\n";
+        }
         ImGui::End();
     }
 
     void Lobby::HandleEvents(GLFWwindow *window)
     {
+        
     }
 };

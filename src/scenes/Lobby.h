@@ -11,6 +11,9 @@
 #include <map>
 #include <vector>
 
+#include "soloud.h"
+#include "soloud_wav.h"
+
 struct ImageData;
 
 namespace scene{
@@ -49,6 +52,8 @@ namespace scene{
         glm::mat4 mvp;
         
         void manageServerEvents();
+
+        SoLoud::Wav sample;
 
         //WARNING: This function creation is quite a questionable decision.
         void serverUpdate();

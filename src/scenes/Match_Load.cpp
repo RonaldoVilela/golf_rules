@@ -31,16 +31,10 @@ namespace scene{
 
             worldId = b2CreateWorld(&worldDef);
 
-            b2BodyDef groundBodyDef = b2DefaultBodyDef();
-            groundBodyDef.position = (b2Vec2){-1.8f, -3.0f};
-            groundBodyDef.rotation = b2MakeRot(1.0f);
+            b2BodyDef boundsBodyDef = b2DefaultBodyDef();
+            boundsBodyDef.position = (b2Vec2){0.0f, 0.0f};
 
-            groundBodyId = b2CreateBody(worldId, &groundBodyDef);
-
-            b2Polygon groundBox = b2MakeBox(1.5f, 1.5f);
-            b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-            groundShapeDef.isSensor = true;
-            b2CreatePolygonShape(groundBodyId, &groundShapeDef, &groundBox); 
+            mapBoundsId = b2CreateBody(worldId, &boundsBodyDef);
 
             ball.loadBody(worldId);
             //----------------------------- //
@@ -51,8 +45,71 @@ namespace scene{
 
             // reading file data here: >>>>>>>>>>
 
+            // bounds >>
+
+            {
+
+            b2ShapeDef boundShapeDef = b2DefaultShapeDef();
+            boundShapeDef.isSensor = true;
+            int bound_point_count = 0;
+            file.read((char*)&bound_point_count, sizeof(int)); // amount of points
+
+            std::cout << "Map bound points: " << bound_point_count << "\n";
+            
+            for(int i = 0; i < bound_point_count; i++){
+                b2Vec2 point;
+                
+                file.read((char*)&point, sizeof(b2Vec2));
+                mapBound_points.push_back(point);
+            }
+
+            for(int i = 0; i < bound_point_count; i++){
+                b2Segment seg;
+                seg.point1 = mapBound_points[i];
+
+                if(i+1 < bound_point_count){
+                    seg.point2 = mapBound_points[i+1];
+                }else{
+                    seg.point2 = mapBound_points[0];
+                }
+                
+                b2CreateSegmentShape(mapBoundsId, &boundShapeDef, &seg);
+            }
+
+            //free(bound_points);
+            }
+            
+            std::cout << "now reading the spawn and hole positions: " << "\n";
+            // spawn and hole
+            file.read((char*)&spawn_position, sizeof(b2Vec2));
+            std::cout << "spawn position = " << spawn_position.x << " : " << spawn_position.y << "\n";
+            b2Body_SetTransform(ball.bodyId, spawn_position, b2MakeRot(0));
+
+            file.read((char*)&hole_position, sizeof(b2Vec2));
+
+            {
+            b2BodyDef holeBodyDef = b2DefaultBodyDef();
+            holeBodyDef.type = b2_staticBody;
+            holeBodyDef.position = hole_position;
+
+            holeId = b2CreateBody(worldId, &holeBodyDef);
+
+            b2Circle holeCircle;
+            holeCircle.center = (b2Vec2){0.0f, 0.0f};
+            holeCircle.radius = 0.25f;
+            b2ShapeDef holeShapeDef = b2DefaultShapeDef();
+            holeShapeDef.isSensor = true;
+
+            b2CreateCircleShape(holeId, &holeShapeDef, &holeCircle);
+            }
+            
+            std::cout << "hole position = " << hole_position.x << " : " << hole_position.y << "\n";
+
+            // groups >>
+
             int groupCount = 0;
             file.read((char*)&groupCount, sizeof(int)); // amount of wall groups
+            std::cout << "Map has " << groupCount << " wall groups\n";
 
             for(int i = 0; i < groupCount; i++){
                 
@@ -73,6 +130,9 @@ namespace scene{
                     file.read((char*)&newWall.inclination, sizeof(int));
                     file.read((char*)&newWall.tan, sizeof(float));
                     file.read((char*)&newWall.tall, sizeof(bool));
+
+                    std::cout << "-- wall " << w << " point 1 >> " << newWall.point1.x << " : " << newWall.point1.x << "\n"; 
+                    std::cout << "-- wall " << w << " point 2 >> " << newWall.point2.x << " : " << newWall.point2.x << "\n"; 
 
                     groups[i].walls.push_back(newWall);
 
@@ -104,6 +164,7 @@ namespace scene{
         for(WallGroup g: groups){
             g.clearResources();
         }
+        mapBound_points.clear();
         groups.clear();
         resources_loaded = false;
     }

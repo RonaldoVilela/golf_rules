@@ -3,6 +3,11 @@
 #include "Scene.h"
 #include "Renderer.h"
 #include "box2d/box2d.h"
+#include "box2d/base.h"
+#include "box2d/collision.h"
+#include "box2d/types.h"
+#include "box2d/id.h"
+#include "box2d/math_functions.h"
 #include <map>
 #include <vector>
 
@@ -18,7 +23,7 @@ namespace scene{
 
         b2ShapeId shapeId;
 
-        void setAtive(bool active);
+        void setActive(bool active);
     };
 
     struct WallGroup{
@@ -43,6 +48,7 @@ namespace scene{
         float height = 0.0f;
         float air_time = 0.0f;
         int state = 0;
+        bool out_of_bounds = false;
 
         void update(float deltaTime);
         void setImpulse();
@@ -50,7 +56,7 @@ namespace scene{
     };
 
     enum MatchRoles{
-        ESPECTATOR = 0,
+        SPECTATOR = 0,
         PLAYER_1 = 1,
         PLAYER_2 = 2,
     };
@@ -62,8 +68,13 @@ namespace scene{
         glm::mat4 view;
 
         b2WorldId worldId;
-        b2BodyId groundBodyId;
+        b2BodyId mapBoundsId;
+        std::vector<b2Vec2> mapBound_points;
+
+        b2BodyId holeId;
         Ball ball;
+        
+        b2Vec2 spawn_position, hole_position;
 
         std::vector<WallGroup> groups;
 
@@ -77,6 +88,7 @@ namespace scene{
 
         void manageMatchEvents();
         int player_role = 0;
+        int actual_turn = 0;
 
         bool resources_loaded = false;
 

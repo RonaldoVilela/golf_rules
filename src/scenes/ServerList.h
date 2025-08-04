@@ -12,6 +12,7 @@
 #include <vector>
 
 struct ServerInfo;
+
 namespace scene{
     class ServerList : public Scene{
         private:

@@ -5,67 +5,7 @@
 #include <fstream>
 
 namespace scene{
-    void Wall::setAtive(bool active)
-    {
-        b2Filter filter = b2Shape_GetFilter(shapeId);
-        if(active){
-            filter.maskBits = 0xFFFF;
-        }else{
-            filter.maskBits = 0x0000;
-        }
-        b2Shape_SetFilter(shapeId, filter);
-    }
-
-    void Ball::loadBody(b2WorldId worldId)
-    {
-        b2BodyDef ballBodyDef = b2DefaultBodyDef();
-        ballBodyDef.type = b2_dynamicBody;
-        ballBodyDef.position = (b2Vec2){0.0f, 0.0f};
-        ballBodyDef.linearDamping = 1.0f;
-
-        bodyId = b2CreateBody(worldId, &ballBodyDef);
-
-        b2Circle ballCircle;
-        ballCircle.center = (b2Vec2){0.0f, 0.0f};
-        ballCircle.radius = 0.25f;
-        b2ShapeDef ballShapeDef = b2DefaultShapeDef();
-        ballShapeDef.density = 1.0f;
-        ballShapeDef.friction = 0.0f;
-        ballShapeDef.restitution = 1.0f;
-
-        b2CreateCircleShape(bodyId, &ballShapeDef, &ballCircle);
-    }
-
-    void Ball::update(float deltaTime)
-    {
-        if(abs(b2Body_GetLinearVelocity(bodyId).x) <= 0.09f && abs(b2Body_GetLinearVelocity(bodyId).y) <= 0.09f){
-            b2Body_SetLinearVelocity(bodyId, {0.0f, 0.0f});
-        }
-        if(state == ON_AIR){
-            air_time += 1.0f * deltaTime;
-            height = -pow((2*air_time - 1), 2) + 1;
-
-            if(height <= 0.0f){
-                height = 0.0f;
-                air_time = 0.0f;
-                onGroundContact();
-            }
-        }
-        
-    }
-
-    void Ball::setImpulse()
-    {
-        state = ON_AIR;
-        b2Body_SetLinearDamping(bodyId, 0.0f);
-    }
-
-    void Ball::onGroundContact()
-    {
-        state = ON_GROUND;
-        b2Body_SetLinearDamping(bodyId, 1.0f);
-    }
-
+    
     void Match::manageMatchEvents()
     {
         while(manager->eventList.size() > 0){
@@ -168,7 +108,7 @@ namespace scene{
 
     void Match::start()
     {
-        player_role = ESPECTATOR;
+        player_role = SPECTATOR;
         if(manager->player.connection_id == GameManager::actual_server.playerId_1){
             player_role = PLAYER_1;
         }else if(manager->player.connection_id == GameManager::actual_server.playerId_2){
@@ -183,6 +123,7 @@ namespace scene{
         }
         if(!resources_loaded){return;}
 
+        // camera ----
         zoom += GameManager::scrollFactor * deltaTime;
         if(zoom < 0.1f){zoom = 0.1f;}
         if(zoom > 3.0f){zoom = 3.0f;}
@@ -190,15 +131,69 @@ namespace scene{
 
         b2World_Step(worldId, deltaTime, 4);
         ball.update(deltaTime);
+        //------------
+
+        //  Check map bounds
+        {
+        b2DistanceInput input;
+
+        input.transformA = b2Body_GetTransform(ball.bodyId);
+        b2Vec2 ballCenter = {0.0f, 0.0f};
+        
+        input.proxyA = b2MakeProxy(&ballCenter, 1, 0.0f);
+
+        input.transformB = b2Body_GetTransform(mapBoundsId);
+        b2SimplexCache cache = {0};
+        b2Simplex simplexBuffer[1];
+
+        int lineCount = b2Body_GetShapeCount(mapBoundsId);
+        float shorterDistance;
+
+        for(int i = 0; i < lineCount; i++){
+            
+            b2Vec2 verts[2];
+            if(i + 1 >= lineCount){
+                verts[0] = mapBound_points[i];
+                verts[1] = mapBound_points[0];
+            }else{
+                verts[0] = mapBound_points[i];
+                verts[1] = mapBound_points[i+1];
+            }
+            input.proxyB = b2MakeProxy(verts, 2, 0);
+
+            b2DistanceOutput output = b2ShapeDistance(&cache, &input, simplexBuffer, 1);
+
+            b2Vec2 ball_point = output.pointA;
+            if(i == 0){shorterDistance = b2Distance(output.pointA, output.pointB);}
+            
+            if(b2Distance(output.pointA, output.pointB) <= shorterDistance){
+                shorterDistance = b2Distance(output.pointA, output.pointB);
+                b2Vec2 bound_point = output.pointB;
+
+                b2Vec2 dir = {verts[0].x - verts[1].x, verts[0].y - verts[1].y};
+                b2Vec2 norm = {-dir.y, dir.x};
+
+                b2Vec2 distanceVec = {ball_point.x - bound_point.x, ball_point.y - bound_point.y};
+                if(distanceVec.x*norm.x + distanceVec.y*norm.y < 0){
+                    ball.out_of_bounds = true;
+                }else{
+                    ball.out_of_bounds = false;
+                }
+            }
+            
+        }
+
+        } // end of temporary scope
+        
 
         //  Check if the wall should be active, acoording to the ball height.
         for(WallGroup g: groups){
             for(int i = 0; i < g.walls.size(); i++){
                 if(!g.walls[i].tall && ball.height > 0.1f){
-                    g.walls[i].setAtive(false);
+                    g.walls[i].setActive(false);
                 }
                 if(!g.walls[i].tall && ball.height <= 0.1f){
-                    g.walls[i].setAtive(true);
+                    g.walls[i].setActive(true);
                 }
             }
         }
@@ -213,6 +208,10 @@ namespace scene{
         manager->activeShader->SetUniformMat4f("u_Projection", manager->projection);
         manager->activeShader->SetUniformMat4f("u_View", view);
 
+        Renderer::drawSegment(manager->line, (float*)&mapBound_points[0], mapBound_points.size(),{0.0f, 0.0f, 1.0f, 1.0f});
+
+        Renderer::drawShape(manager->circle, b2Body_GetPosition(holeId).x, b2Body_GetPosition(holeId).y, 0.5f,{0.0f, 1.0f, 0.5f, 1.0f});
+
         Renderer::drawShape(manager->circle, b2Body_GetPosition(ball.bodyId).x, b2Body_GetPosition(ball.bodyId).y, 0.5f,{1.0f, 0.0f, 0.0f, 1.0f});
         float base[2] = {b2Body_GetPosition(ball.bodyId).x, b2Body_GetPosition(ball.bodyId).y};
         float altitude[2] = {b2Body_GetPosition(ball.bodyId).x, b2Body_GetPosition(ball.bodyId).y + ball.height};
@@ -224,7 +223,7 @@ namespace scene{
             }
         }
 
-        Renderer::drawShape(manager->square, b2Body_GetPosition(groundBodyId).x, b2Body_GetPosition(groundBodyId).y, 3.0f, 3.0f, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f});
+        //Renderer::drawShape(manager->square, b2Body_GetPosition(gId).x, b2Body_GetPosition(groundBodyId).y, 3.0f, 3.0f, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f});
 
         Renderer::drawShape(manager->square, mouseWorldPos.x, mouseWorldPos.y, 0.2f, 0.2f, 0.0f, {1.0f, 1.0f, 1.0f, 1.0f});
 
@@ -237,12 +236,18 @@ namespace scene{
         GameManager::activeShader->SetUniformMat4f("u_MVP", manager->windowProjection);
 
         switch(player_role){
-            case ESPECTATOR: Renderer::drawString("[Espectating...]", 0, 20,0.8f, {1.0f, 1.0f, 1.0f, 1.0f});
+            case SPECTATOR: Renderer::drawString("[Spectating...]", 0, 20,0.8f, {1.0f, 1.0f, 1.0f, 1.0f});
                 break;
             case PLAYER_1: Renderer::drawString("[Player 1]", 0, 20,0.8f, {0.0f, 0.0f, 1.0f, 1.0f});
                 break;
             case PLAYER_2: Renderer::drawString("[Player 2]", 0, 20,0.8f, {1.0f, 0.0f, 0.0f, 1.0f});
                 break;
+        }
+
+        if(ball.out_of_bounds){
+            Renderer::drawString("Ball out", 0, 80,0.8f, {1.0f, 1.0f, 0.0f, 1.0f});
+        }else{
+            Renderer::drawString("Ball in", 0, 80,0.8f, {1.0f, 1.0f, 1.0f, 1.0f});
         }
         
         manager->ui_FrameBuffer.Unbind();
@@ -272,7 +277,9 @@ namespace scene{
                 startMouseWorldPos = manager->mouseNormPos;
             }
 
-            camPosOffset = {(manager->mouseNormPos.x - startMouseWorldPos.x)/zoom, (manager->mouseNormPos.y - startMouseWorldPos.y)/zoom, 0.0f, 0.0f};
+            camPosOffset = {(manager->mouseNormPos.x - startMouseWorldPos.x)/zoom, // x
+                            (manager->mouseNormPos.y - startMouseWorldPos.y)/zoom, // y
+                            0.0f, 0.0f};                                           // z
 
         }
 
@@ -289,19 +296,31 @@ namespace scene{
         }
 
         if(ImGui::GetIO().WantCaptureMouse){return;}
+
         if(b2Body_GetLinearVelocity(ball.bodyId).x == 0.0f && b2Body_GetLinearVelocity(ball.bodyId).y == 0.0f){
             if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
-                std::cout << "added impulse \n";
-                b2Vec2 impulse = (b2Vec2){(b2Body_GetPosition(ball.bodyId).x - mouseWorldPos.x) * 25, 
-                    (b2Body_GetPosition(ball.bodyId).y - mouseWorldPos.y) * 25};
-                b2Body_ApplyForceToCenter(ball.bodyId, impulse, true);
+                //std::cout << "added impulse \n";
+                b2Vec2 direction = (b2Vec2){(b2Body_GetPosition(ball.bodyId).x - mouseWorldPos.x), 
+                    (b2Body_GetPosition(ball.bodyId).y - mouseWorldPos.y)};
+                
+                float force = sqrt((direction.x*direction.x) + (direction.y*direction.y));
+
+                if(force > 0){
+                    direction.x /= force;
+                    direction.y /= force;
+
+                    force *= 25;
+
+                    if(force > 55){force = 55;}
+                    b2Vec2 impulse = {direction.x * force, direction.y * force};
+                    b2Body_ApplyForceToCenter(ball.bodyId, impulse, true);
+                }
+
+                
             }
         }
     }
 
-    //TODO: Move this function to a different location, maybe create a .cpp file just for struct function declaraions.
-    void WallGroup::clearResources()
-    {
-    }
+    
 
 }

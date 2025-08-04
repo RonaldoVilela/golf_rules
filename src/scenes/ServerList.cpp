@@ -49,6 +49,7 @@ namespace scene{
 
         if(ImGui::Button("Search server")){
             local_servers.clear();
+            // TODO: Search more than one server on network (put this function on a new thread)
             ServerInfo info = manager->searchServer();
             if(info.valid){
                 GM_LOG("-- Response from the server: "+ info.m_name + " --");

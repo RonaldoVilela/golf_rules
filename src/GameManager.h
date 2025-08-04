@@ -320,6 +320,13 @@ public:
      */
     bool joinServer(const char* ipAddress, int port);
 
+    /**
+     * Searches a single active server on the local network.
+     * 
+     * @returns The ServerInfo from the found server. If the returned ServerInfo
+     * is not valid (ServerInfo.valid == false), it means it couldn't find an
+     * active server on the network.
+     */
     ServerInfo searchServer();
 
     static void disconnect();

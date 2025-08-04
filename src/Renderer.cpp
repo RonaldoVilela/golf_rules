@@ -146,7 +146,7 @@ void Renderer::drawSegment(shapes::Line *line, float *vertices, unsigned int cou
     GLCall(glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * count * 2, vertices));
 
     line->va->Bind();
-    GLCall(glDrawArrays(GL_LINE_STRIP, 0, count));
+    GLCall(glDrawArrays(GL_LINE_LOOP, 0, count));
 }
 
 
